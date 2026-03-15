@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" 
+
+}
+
+// ================= ENUMS =================
+
+enum Role {
+  STUDENT
+  PROFESSOR
+}
+
+enum QuizStatus {
+  DRAFT       
+  LIVE        
+  COMPLETED   
+}
+
+enum QuestionType {
+  SINGLE_CORRECT
+  MULTI_CORRECT
+  FILL_IN_BLANK
+  INTEGER_TYPE
+  DESCRIPTIVE
+}
+
+// ================= MODELS =================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(STUDENT) // Default student
+
+  createdQuizzes  Quiz[]           @relation("ProfessorQuizzes")
+  attempts        StudentAttempt[] @relation("StudentAttempts")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Quiz {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  code        String     @unique 
+  status      QuizStatus @default(DRAFT)
+  startTime   DateTime?  
+  endTime     DateTime?  
+  
+  professorId String
+  professor   User       @relation("ProfessorQuizzes", fields: [professorId], references: [id], onDelete: Cascade)
+
+  questions   Question[]
+  attempts    StudentAttempt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Question {
+  id          String       @id @default(cuid())
+  text        String       
+  imageUrl    String?      // 🔥 IMAGE URL ADDED HERE 🔥
+  type        QuestionType
+  timeLimit   Int          
+  marks       Int          @default(4) 
+  negative    Int          @default(1) 
+  
+  quizId      String
+  quiz        Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  options     Option[]     
+  answers     StudentAnswer[]
+
+  createdAt DateTime @default(now())
+}
+
+model Option {
+  id         String   @id @default(cuid())
+  text       String
+  isCorrect  Boolean  @default(false)
+  
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+model StudentAttempt {
+  id         String    @id @default(cuid())
+  score      Float     @default(0) 
+  isFinished Boolean   @default(false)
+  startedAt  DateTime  @default(now())
+  endedAt    DateTime?
+
+  studentId  String
+  student    User      @relation("StudentAttempts", fields: [studentId], references: [id], onDelete: Cascade)
+  
+  quizId     String
+  quiz       Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  answers    StudentAnswer[]
+
+  @@unique([studentId, quizId]) 
+}
+
+model StudentAnswer {
+  id               String   @id @default(cuid())
+  textResponse     String?  
+  selectedOptions  String[] 
+  
+  isCorrect        Boolean? 
+  marksAwarded     Float    @default(0)
+
+  attemptId        String
+  attempt          StudentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  questionId       String
+  question         Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId]) 
+}
