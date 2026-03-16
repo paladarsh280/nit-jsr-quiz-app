@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
-import { Inter, Geist } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
-import { cn } from "@/lib/utils";
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+import { Toaster } from "@/components/ui/sonner"; // 🔥 Ye import kiya
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -13,15 +11,14 @@ export const metadata: Metadata = {
   description: "Official Quiz Portal for NIT Jamshedpur",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
+    <html lang="en">
       <body className={inter.className}>
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <Toaster position="top-center" richColors /> {/* 🔥 Ye add kiya */}
+        </Providers>
       </body>
     </html>
   );
