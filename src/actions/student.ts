@@ -122,12 +122,12 @@ export async function submitExam(quizId: string, answersJson: string) {
 
             if (studentAns !== undefined && studentAns !== null && studentAns !== "") {
                 if (question.type === "SINGLE_CORRECT") {
-                    const correctOpt = question.options.find(o => o.isCorrect);
+                    const correctOpt = question.options.find((o: any) => o.isCorrect);
                     if (correctOpt && correctOpt.id === studentAns) isCorrect = true;
                     formattedOptions = [studentAns as string];
                 }
                 else if (question.type === "MULTI_CORRECT") {
-                    const correctOpts = question.options.filter(o => o.isCorrect).map(o => o.id);
+                    const correctOpts = question.options.filter((o: any) => o.isCorrect).map((o: any) => o.id);
                     const studentOpts = studentAns as string[];
                     if (studentOpts.length === correctOpts.length && studentOpts.every(id => correctOpts.includes(id))) {
                         isCorrect = true;
