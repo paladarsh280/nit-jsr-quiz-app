@@ -32,7 +32,7 @@ export function Footer() {
 
                 {/* Right Side: GitHub Icon */}
                 <a
-                    href="https://github.com/paladarsh280/ojass2026"
+                    href="https://github.com/paladarsh280/nit-jsr-quiz-app"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors group"
