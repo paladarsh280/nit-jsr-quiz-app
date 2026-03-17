@@ -10,7 +10,8 @@ import { verifyAndJoinQuiz } from "@/actions/student";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { GraduationCap, ArrowRight, Loader2, Clock, CheckCircle2 } from "lucide-react";
+import { GraduationCap, ArrowRight, Loader2, Clock, CheckCircle2, QrCode, X } from "lucide-react";
+import { Html5QrcodeScanner } from "html5-qrcode";
 
 export default function StudentDashboard() {
     const { data: session } = useSession();
@@ -18,6 +19,54 @@ export default function StudentDashboard() {
 
     const [code, setCode] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+
+    const [isScanning, setIsScanning] = useState(false);
+
+    // Initialize QR Scanner when modal opens
+    const startScanner = () => {
+        setIsScanning(true);
+        setTimeout(() => {
+            const scanner = new Html5QrcodeScanner("reader", { 
+                qrbox: { width: 250, height: 250 }, 
+                fps: 5 
+            }, false);
+            
+            scanner.render((text) => {
+                scanner.clear();
+                setIsScanning(false);
+                handleScannedUrl(text);
+            }, (err) => {
+                // Ignore continuous scan errors (normal behavior when no QR is in frame)
+            });
+        }, 100);
+    };
+
+    const stopScanner = () => {
+        setIsScanning(false);
+        // We can't perfectly unmount the scanner immediately without html5-qrcode throwing,
+        // but removing it from the DOM handles most of it, we just let it die.
+    };
+
+    const handleScannedUrl = async (url: string) => {
+        try {
+            // Expected URL format: http://domain.com/test/[quizId]
+            const urlObj = new URL(url);
+            const pathParts = urlObj.pathname.split('/');
+            // ["", "test", "cm8s32d8..."]
+            if (pathParts[1] === 'test' && pathParts[2]) {
+                const scannedQuizId = pathParts[2];
+                // Since our join API takes a 6-letter `code`, but the QR encodes the `quizId`...
+                // Wait, if the URL routes directly to `/test/[quizId]`, we don't even need to verify the code here!
+                // The student just needs to be redirected to that URL. The test page itself handles verification if they are enrolled/etc.
+                toast.success("QR Code scanned automatically!");
+                router.push(`/test/${scannedQuizId}`);
+            } else {
+                toast.error("Invalid QR Code format.");
+            }
+        } catch (e) {
+            toast.error("Unrecognized QR Code. Please try again.");
+        }
+    };
 
     const handleJoin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -81,14 +130,23 @@ export default function StudentDashboard() {
                                     maxLength={6}
                                 />
                             </div>
-                            <Button
-                                type="submit"
-                                disabled={isLoading || code.length !== 6}
-                                className="w-full h-14 text-lg font-bold bg-blue-600 hover:bg-blue-700 gap-2"
-                            >
-                                {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : "Join Now"}
-                                {!isLoading && <ArrowRight className="h-5 w-5" />}
-                            </Button>
+                            <div className="grid grid-cols-[1fr_auto] gap-3">
+                                <Button
+                                    type="submit"
+                                    disabled={isLoading || code.length !== 6}
+                                    className="w-full h-14 text-lg font-bold bg-blue-600 hover:bg-blue-700 gap-2"
+                                >
+                                    {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : "Join with Code"}
+                                    {!isLoading && <ArrowRight className="h-5 w-5" />}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={startScanner}
+                                    className="h-14 px-6 text-lg font-bold bg-purple-600 hover:bg-purple-700 gap-2"
+                                >
+                                    <QrCode className="h-6 w-6" /> Scan
+                                </Button>
+                            </div>
                         </form>
                     </CardContent>
                 </Card>
@@ -117,6 +175,26 @@ export default function StudentDashboard() {
                 </div>
 
             </div>
+
+            {/* QR Scanner Modal */}
+            {isScanning && (
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 transition-all">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center p-4 border-b">
+                            <h3 className="text-xl font-bold flex items-center gap-2"><QrCode className="h-5 w-5" /> Scan to Join</h3>
+                            <Button variant="ghost" size="icon" onClick={stopScanner} className="hover:bg-red-50 hover:text-red-500">
+                                <X className="h-5 w-5" />
+                            </Button>
+                        </div>
+                        <div className="p-6">
+                            <div id="reader" className="w-full mx-auto rounded-xl overflow-hidden [&_video]:rounded-xl [&_video]:object-cover" />
+                            <p className="text-center text-sm text-gray-500 mt-4">
+                                Point your camera at the professor's screen
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

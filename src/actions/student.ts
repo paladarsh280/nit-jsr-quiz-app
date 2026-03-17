@@ -374,8 +374,42 @@ export async function submitLiveAnswer(
         }
 
         return { success: true, isCorrect, marksAwarded };
-    } catch (error) {
-        console.error("Live Answer Error:", error);
+    } catch {
+        // console.error("Live Answer Error:", error);
         return { success: false, error: "Failed to submit answer." };
+    }
+}
+
+// 4. LIVE GUIDED MODE: Get Top 5 Leaderboard + Current Student Rank
+export async function getLiveLeaderboardForStudent(quizId: string) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session || session.user.role !== "STUDENT") return { success: false, error: "Unauthorized" };
+        const studentId = session.user.id;
+
+        const attempts = await prisma.studentAttempt.findMany({
+            where: { quizId },
+            include: {
+                student: { select: { name: true, id: true } }
+            },
+            orderBy: { score: 'desc' }
+        });
+
+        const leaderboard = attempts.map((a, idx) => ({
+            rank: idx + 1,
+            name: a.student.name || "Student",
+            studentId: a.student.id,
+            score: a.score
+        }));
+
+        // Top 3 for podium display
+        const top3 = leaderboard.slice(0, 3);
+        
+        // Find current student's stats
+        const myStats = leaderboard.find(l => l.studentId === studentId);
+
+        return { success: true, top3, fullList: leaderboard, myStats };
+    } catch {
+        return { success: false, error: "Failed to fetch leaderboard" };
     }
 }

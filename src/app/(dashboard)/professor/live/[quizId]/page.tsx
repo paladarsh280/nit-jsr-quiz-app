@@ -43,31 +43,56 @@ export default function LiveGuidedRoom() {
         return () => clearInterval(interval);
     }, [fetchQuiz]);
 
-    // Timer logic
+    // Timer logic and phase restoration
     useEffect(() => {
-        if (!quiz || phase !== "question") return;
-        
+        if (!quiz) return;
         const currentQ = quiz.questions[quiz.activeQuestionIndex];
         if (!currentQ) return;
 
-        if (timeLeft === 0 && phase === "question") {
-            setTimeLeft(currentQ.timeLimit);
+        // On initial load or refresh, sync phase from localStorage if it exists for this question
+        const savedState = localStorage.getItem(`prof_state_${quiz.id}`);
+        if (savedState) {
+            try {
+                const parsed = JSON.parse(savedState);
+                if (parsed.activeIndex === quiz.activeQuestionIndex && parsed.phase) {
+                    // Only restore phase if it's not already set to avoid infinite loops
+                    if (phase === "question" && parsed.phase !== "question") {
+                        setPhase(parsed.phase);
+                        setLeaderboardAnimStage(parsed.leaderboardAnimStage || 0);
+                        if (parsed.questionStats) setQuestionStats(parsed.questionStats);
+                        return; // Let the next render handle the non-question phase
+                    }
+                }
+            } catch (e) { /* ignore */ }
         }
 
-        if (timeLeft > 0) {
+        if (phase === "question") {
             const timer = setInterval(() => {
-                setTimeLeft(prev => {
-                    if (prev <= 1) {
-                        // Time's up! Show stats then leaderboard
-                        handleTimeUp();
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
+                const elapsedSec = Math.floor((Date.now() - new Date(quiz.updatedAt).getTime()) / 1000);
+                const calculatedTimeLeft = Math.max(0, currentQ.timeLimit - elapsedSec);
+                
+                setTimeLeft(calculatedTimeLeft);
+
+                if (calculatedTimeLeft === 0) {
+                    clearInterval(timer);
+                    handleTimeUp();
+                }
+            }, 500); // 500ms for tighter accuracy
             return () => clearInterval(timer);
         }
-    }, [quiz?.activeQuestionIndex, phase, timeLeft]);
+    }, [quiz?.activeQuestionIndex, phase, quiz?.updatedAt]);
+
+    // Save professor phase to local storage so refreshes don't reset the view
+    useEffect(() => {
+        if (quiz && phase !== "question") {
+            localStorage.setItem(`prof_state_${quiz.id}`, JSON.stringify({
+                activeIndex: quiz.activeQuestionIndex,
+                phase,
+                leaderboardAnimStage,
+                questionStats
+            }));
+        }
+    }, [phase, leaderboardAnimStage, questionStats, quiz]);
 
     const handleTimeUp = async () => {
         if (!quiz) return;
@@ -109,6 +134,9 @@ export default function LiveGuidedRoom() {
         const nextIndex = quiz.activeQuestionIndex + 1;
         const res = await updateActiveQuestionIndex(quiz.id, nextIndex);
         if (res.success) {
+            // Clear local storage for the new question
+            localStorage.removeItem(`prof_state_${quiz.id}`);
+            
             setPhase("question");
             setQuestionStats(null);
             setLeaderboardAnimStage(0);
@@ -122,8 +150,7 @@ export default function LiveGuidedRoom() {
     };
 
     const handleSkipQuestion = async () => {
-        // Skip = same as next but without waiting for timer
-        setTimeLeft(0);
+        // Skip = jump straight to stats bypassing the timer wait
         handleTimeUp();
     };
 

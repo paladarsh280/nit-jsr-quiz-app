@@ -149,6 +149,14 @@ export async function updateQuizStatus(quizId: string, status: "DRAFT" | "LIVE" 
             data: { status }
         });
 
+        // 🔥 If professor ends the test, automatically finish all ongoing attempts
+        if (status === "COMPLETED") {
+            await prisma.studentAttempt.updateMany({
+                where: { quizId: quizId, isFinished: false },
+                data: { isFinished: true, endedAt: new Date() }
+            });
+        }
+
         // Cache clear karo taaki dashboard pe naya status dikhe
         revalidatePath("/professor");
         revalidatePath(`/professor/history/${quizId}`);

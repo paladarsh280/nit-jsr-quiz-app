@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getQuizForStudent, submitExam, submitLiveAnswer } from "@/actions/student";
+import { getQuizForStudent, submitExam, submitLiveAnswer, getLiveLeaderboardForStudent } from "@/actions/student";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Timer, CheckCircle2, Maximize, Cloud, Hourglass } from "lucide-react";
+import { Loader2, Timer, CheckCircle2, Maximize, Cloud, Hourglass, Trophy, Medal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PremiumLoader } from "@/components/ui/PremiumLoader";
@@ -32,8 +32,10 @@ export default function ExamRoom() {
     // LIVE_GUIDED specific states
     const [liveAnswerSubmitted, setLiveAnswerSubmitted] = useState(false);
     const [liveAnswerResult, setLiveAnswerResult] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
-    const [waitingForProfessor, setWaitingForProfessor] = useState(false);
+    const [waitingForProfessor, setWaitingForProfessor] = useState(false); // TRUE when timer is up
     const [questionStartTime, setQuestionStartTime] = useState<number>(() => Date.now());
+    const [liveLeaderboard, setLiveLeaderboard] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const [leaderboardAnimStage, setLeaderboardAnimStage] = useState(0);
 
     // Stable ref for handleSubmitExam to avoid useEffect dependency issues
     const handleSubmitExamRef = useRef<((isAutoSubmit?: boolean) => Promise<void>) | undefined>(undefined);
@@ -49,12 +51,25 @@ export default function ExamRoom() {
 
                 if (res.quiz.quizMode === "LIVE_GUIDED") {
                     setCurrentIndex((res.quiz as any).activeQuestionIndex);
-                    setTimeLeft(res.quiz.questions[(res.quiz as any).activeQuestionIndex]?.timeLimit || 30);
+                    
+                    // 🔥 Sync timer using the server's updatedAt timestamp
+                    const elapsedSec = Math.floor((Date.now() - new Date(res.quiz.updatedAt).getTime()) / 1000);
+                    const calculatedTimeLeft = Math.max(0, (res.quiz.questions[(res.quiz as any).activeQuestionIndex]?.timeLimit || 30) - elapsedSec);
+                    setTimeLeft(calculatedTimeLeft);
+                    
                     setQuestionStartTime(Date.now());
                     const savedState = localStorage.getItem(`exam_state_${quizId}`);
                     if (savedState) {
-                        try { setAnswers(JSON.parse(savedState).answers || {}); } catch { /* ignore */ }
+                        try { 
+                            const parsed = JSON.parse(savedState);
+                            setAnswers(parsed.answers || {}); 
+                            if (parsed.liveAnswerSubmitted) setLiveAnswerSubmitted(parsed.liveAnswerSubmitted);
+                            if (parsed.liveAnswerResult) setLiveAnswerResult(parsed.liveAnswerResult);
+                            if (parsed.questionStartTime) setQuestionStartTime(parsed.questionStartTime);
+                        } catch { /* ignore */ }
                     }
+                    
+                    if (calculatedTimeLeft === 0) setWaitingForProfessor(true);
                 } else {
                     const savedState = localStorage.getItem(`exam_state_${quizId}`);
                     if (savedState) {
@@ -91,19 +106,38 @@ export default function ExamRoom() {
                 // Check if professor advanced to next question
                 if ((newQuiz as any).activeQuestionIndex > currentIndex) {
                     setCurrentIndex((newQuiz as any).activeQuestionIndex);
-                    setTimeLeft(newQuiz.questions[(newQuiz as any).activeQuestionIndex]?.timeLimit || 30);
+                    
+                    // Reset states for the new question
                     setLiveAnswerSubmitted(false);
                     setLiveAnswerResult(null);
                     setWaitingForProfessor(false);
+                    setLiveLeaderboard(null);
+                    setLeaderboardAnimStage(0);
                     setQuestionStartTime(Date.now());
+                    
+                    // 🔥 Restart exact timer synchronization based on the latest update
+                    const elapsedSec = Math.floor((Date.now() - new Date(newQuiz.updatedAt).getTime()) / 1000);
+                    const calculatedTimeLeft = Math.max(0, (newQuiz.questions[(newQuiz as any).activeQuestionIndex]?.timeLimit || 30) - elapsedSec);
+                    setTimeLeft(calculatedTimeLeft);
+                } else if (isLiveGuided && !waitingForProfessor) {
+                    // Continuous tight sync for late joiners or tab sleepers
+                    const elapsedSec = Math.floor((Date.now() - new Date(newQuiz.updatedAt).getTime()) / 1000);
+                    const calculatedTimeLeft = Math.max(0, (newQuiz.questions[(newQuiz as any).activeQuestionIndex]?.timeLimit || 30) - elapsedSec);
+                    
+                    // Apply synchronization only if it has drifted significantly (>2 seconds) to avoid jitter
+                    if (Math.abs(timeLeft - calculatedTimeLeft) > 2) {
+                        setTimeLeft(calculatedTimeLeft);
+                    }
                 }
                 
                 // Check if quiz ended
                 if (newQuiz.status === "COMPLETED" && !examFinished) {
-                    toast.info("The Professor has ended the quiz. Redirecting...");
+                    toast.info("The Professor has ended the quiz. Auto-submitting...");
                     setExamFinished(true);
                     localStorage.removeItem(`exam_state_${quizId}`);
-                    setTimeout(() => router.push("/student/history"), 2000);
+                    
+                    // Always redirect to dashboard when test ends
+                    setTimeout(() => router.push("/student"), 2000);
                 }
 
                 setQuiz(newQuiz);
@@ -121,7 +155,10 @@ export default function ExamRoom() {
             localStorage.setItem(`exam_state_${quizId}`, JSON.stringify({
                 currentIndex,
                 answers,
-                timeLeft
+                timeLeft,
+                liveAnswerSubmitted,
+                liveAnswerResult,
+                questionStartTime
             }));
             const t1 = setTimeout(() => setSaveStatus("saved"), 500);
             const t2 = setTimeout(() => setSaveStatus("idle"), 2000);
@@ -136,9 +173,20 @@ export default function ExamRoom() {
         if (timeLeft <= 0) {
             if (isLiveGuided) {
                 // In live guided, when time's up, mark as waiting
-                if (!liveAnswerSubmitted) {
-                    // Time ran out without answering
+                if (!waitingForProfessor) {
                     setWaitingForProfessor(true);
+                    // Fetch leaderboard when time is up
+                    getLiveLeaderboardForStudent(quizId).then(res => {
+                        if (res.success) {
+                            setLiveLeaderboard(res);
+                            // Start staggered animation
+                            setLeaderboardAnimStage(0);
+                            setTimeout(() => setLeaderboardAnimStage(1), 400);   // 3rd place
+                            setTimeout(() => setLeaderboardAnimStage(2), 900);   // 2nd place
+                            setTimeout(() => setLeaderboardAnimStage(3), 1400);  // 1st place
+                            setTimeout(() => setLeaderboardAnimStage(4), 2200);  // Full list
+                        }
+                    });
                 }
                 return;
             }
@@ -198,7 +246,7 @@ export default function ExamRoom() {
         const res = await submitLiveAnswer(quizId, questionId, answerValue, type, timeTaken);
         if (res.success) {
             setLiveAnswerResult(res);
-            toast.success(res.isCorrect ? `✅ Correct! +${res.marksAwarded} pts` : `❌ Wrong! ${res.marksAwarded} pts`);
+            toast.success("Answer locked successfully!");
         } else {
             toast.error(res.error || "Failed to submit answer");
             setLiveAnswerSubmitted(false);
@@ -274,11 +322,12 @@ export default function ExamRoom() {
             )}
 
             {/* LIVE_GUIDED: Waiting for Professor Screen */}
-            {isLiveGuided && hasStarted && (liveAnswerSubmitted || waitingForProfessor) && !examFinished && (
-                <div className="absolute inset-0 z-[150] bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
+            {isLiveGuided && hasStarted && waitingForProfessor && !examFinished && (
+                <div className="absolute inset-0 z-[150] bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center overflow-y-auto">
+                    
                     {liveAnswerResult ? (
                         <>
-                            <div className={`h-20 w-20 rounded-full flex items-center justify-center mb-6 ${liveAnswerResult.isCorrect ? 'bg-green-100' : 'bg-red-100'}`}>
+                            <div className={`h-20 w-20 rounded-full flex items-center justify-center mb-6 shadow-lg ${liveAnswerResult.isCorrect ? 'bg-green-100' : 'bg-red-100'}`}>
                                 {liveAnswerResult.isCorrect 
                                     ? <CheckCircle2 className="h-10 w-10 text-green-600" />
                                     : <span className="text-4xl">❌</span>
@@ -287,7 +336,7 @@ export default function ExamRoom() {
                             <h2 className="text-3xl font-bold mb-2">
                                 {liveAnswerResult.isCorrect ? "Correct!" : "Wrong!"}
                             </h2>
-                            <p className={`text-2xl font-bold ${liveAnswerResult.marksAwarded >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            <p className={`text-2xl font-bold mb-8 ${liveAnswerResult.marksAwarded >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                 {liveAnswerResult.marksAwarded >= 0 ? '+' : ''}{liveAnswerResult.marksAwarded} Points
                             </p>
                         </>
@@ -295,11 +344,85 @@ export default function ExamRoom() {
                         <>
                             <Hourglass className="h-16 w-16 text-amber-500 mb-6 animate-pulse" />
                             <h2 className="text-2xl font-bold text-gray-800 mb-2">Time&apos;s Up!</h2>
+                            <p className="text-gray-500 mb-8 max-w-sm">You didn&apos;t answer in time.</p>
                         </>
                     )}
-                    <div className="mt-8 flex items-center gap-3 text-gray-500">
+
+                    {/* Show Leaderboard */}
+                    {liveLeaderboard?.top3 && (
+                        <div className="w-full max-w-2xl animate-in slide-in-from-bottom-8 fade-in duration-500 mb-8 flex flex-col items-center">
+                            <h3 className="text-2xl font-black mb-8 flex items-center justify-center gap-3 text-gray-800">
+                                <Trophy className="text-yellow-500 w-8 h-8" /> Live Leaderboard
+                            </h3>
+                            
+                            {/* Top 3 Podium Animation (Same as Professor View) */}
+                            <div className="flex items-end justify-center gap-4 h-48 w-full max-w-md mx-auto mb-10">
+                                {/* 2nd Place */}
+                                <div className={`flex flex-col items-center transition-all duration-700 ease-out flex-1 ${leaderboardAnimStage >= 2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                                    <Medal className="h-8 w-8 text-gray-400 mb-2" />
+                                    <p className="text-sm font-bold text-gray-700 truncate w-full px-1">{liveLeaderboard.top3[1]?.name || "—"}</p>
+                                    <p className="text-xs text-gray-500">{liveLeaderboard.top3[1]?.score ?? "—"} pts</p>
+                                    <div className="w-full max-w-[80px] bg-gray-300 rounded-t-lg mt-2 shadow-inner" style={{ height: '100px' }}>
+                                        <div className="h-full flex items-center justify-center text-3xl font-black text-white">2</div>
+                                    </div>
+                                </div>
+                                
+                                {/* 1st Place */}
+                                <div className={`flex flex-col items-center transition-all duration-700 ease-out flex-1 ${leaderboardAnimStage >= 3 ? 'opacity-100 translate-y-0 scale-110 z-10' : 'opacity-0 translate-y-10'}`}>
+                                    <Trophy className="h-10 w-10 text-yellow-500 mb-2 drop-shadow-md" />
+                                    <p className="text-sm font-bold text-gray-900 truncate w-full px-1">{liveLeaderboard.top3[0]?.name || "—"}</p>
+                                    <p className="text-xs text-gray-500">{liveLeaderboard.top3[0]?.score ?? "—"} pts</p>
+                                    <div className="w-full max-w-[90px] bg-yellow-400 rounded-t-lg mt-2 shadow-inner" style={{ height: '140px' }}>
+                                        <div className="h-full flex items-center justify-center text-4xl font-black text-white drop-shadow-sm">1</div>
+                                    </div>
+                                </div>
+                                
+                                {/* 3rd Place */}
+                                <div className={`flex flex-col items-center transition-all duration-700 ease-out flex-1 ${leaderboardAnimStage >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                                    <Medal className="h-7 w-7 text-amber-600 mb-2" />
+                                    <p className="text-sm font-bold text-gray-700 truncate w-full px-1">{liveLeaderboard.top3[2]?.name || "—"}</p>
+                                    <p className="text-xs text-gray-500">{liveLeaderboard.top3[2]?.score ?? "—"} pts</p>
+                                    <div className="w-full max-w-[80px] bg-amber-500 rounded-t-lg mt-2 shadow-inner" style={{ height: '70px' }}>
+                                        <div className="h-full flex items-center justify-center text-3xl font-black text-white">3</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Full Scrollable List below Top 3 */}
+                            {leaderboardAnimStage >= 4 && liveLeaderboard.fullList && liveLeaderboard.fullList.length > 3 && (
+                                <Card className="w-full shadow-lg border-t-4 border-t-purple-600 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <CardContent className="p-0">
+                                        <div className="max-h-[250px] overflow-y-auto p-4 space-y-2 bg-gray-50 rounded-b-xl">
+                                            {liveLeaderboard.fullList.slice(3).map((entry: any) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
+                                                <div key={entry.studentId} className={`flex justify-between items-center p-3 rounded-lg border bg-white shadow-sm hover:shadow-md transition-shadow ${
+                                                    entry.studentId === liveLeaderboard.myStats?.studentId ? "ring-2 ring-purple-400 border-transparent bg-purple-50" : "border-gray-200"
+                                                }`}>
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 font-bold flex items-center justify-center shadow-inner">
+                                                            #{entry.rank}
+                                                        </div>
+                                                        <span className="font-semibold text-gray-800 text-left">{entry.name} {entry.studentId === liveLeaderboard.myStats?.studentId && "(You)"}</span>
+                                                    </div>
+                                                    <span className="font-bold text-purple-700">{entry.score} pts</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {/* Your Stats Summary if not in Top 3 but leaderboard finished animating */}
+                            {leaderboardAnimStage >= 4 && liveLeaderboard.myStats && liveLeaderboard.myStats.rank > 3 && (
+                                <div className="mt-4 px-6 py-3 bg-purple-100 text-purple-800 rounded-full font-bold shadow-sm animate-in zoom-in duration-300">
+                                    Your Rank: #{liveLeaderboard.myStats.rank} — Score: {liveLeaderboard.myStats.score} pts
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="mt-4 flex items-center gap-3 text-gray-500">
                         <Loader2 className="h-5 w-5 animate-spin" />
-                        <span className="text-lg">Waiting for professor to show next question...</span>
+                        <span className="text-lg font-medium">Waiting for professor to show next question...</span>
                     </div>
                 </div>
             )}
