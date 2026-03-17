@@ -53,8 +53,10 @@ model Quiz {
   description String?
   code        String     @unique 
   status      QuizStatus @default(DRAFT)
-  startTime   DateTime?  
-  endTime     DateTime?  
+  startTime           DateTime?  
+  endTime             DateTime?  
+  quizMode            String     @default("NORMAL") // "NORMAL" or "LIVE_GUIDED"
+  activeQuestionIndex Int        @default(0)
   
   professorId String
   professor   User       @relation("ProfessorQuizzes", fields: [professorId], references: [id], onDelete: Cascade)
@@ -120,6 +122,7 @@ model StudentAnswer {
   
   isCorrect        Boolean? 
   marksAwarded     Float    @default(0)
+  timeTaken        Int      @default(0) // seconds taken to answer (for speed-based scoring)
 
   attemptId        String
   attempt          StudentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)

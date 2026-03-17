@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlusCircle, Trash2, Save, Clock, HelpCircle, Upload, X } from "lucide-react";
+import { PlusCircle, Trash2, Save, Clock, HelpCircle, Upload, X, FileJson } from "lucide-react";
 
 type QuestionType = "SINGLE_CORRECT" | "MULTI_CORRECT" | "FILL_IN_BLANK" | "INTEGER_TYPE" | "DESCRIPTIVE";
 
@@ -40,6 +40,7 @@ export default function CreateTestPage() {
     const [description, setDescription] = useState("");
     const [startTime, setStartTime] = useState("");
     const [endTime, setEndTime] = useState("");
+    const [quizMode, setQuizMode] = useState<"NORMAL" | "LIVE_GUIDED">("NORMAL");
     const [questions, setQuestions] = useState<Question[]>([]);
     const [isMounted, setIsMounted] = useState(false);
 
@@ -54,6 +55,7 @@ export default function CreateTestPage() {
                 if (parsed.description) setDescription(parsed.description);
                 if (parsed.startTime) setStartTime(parsed.startTime);
                 if (parsed.endTime) setEndTime(parsed.endTime);
+                if (parsed.quizMode) setQuizMode(parsed.quizMode);
                 if (parsed.questions && Array.isArray(parsed.questions)) setQuestions(parsed.questions);
                 // Optionally notify that draft was loaded
                 toast.success("Draft restored automatically!");
@@ -66,10 +68,10 @@ export default function CreateTestPage() {
     // Continuous Autosave
     useEffect(() => {
         if (isMounted) {
-            const draftData = { title, description, startTime, endTime, questions };
+            const draftData = { title, description, startTime, endTime, quizMode, questions };
             localStorage.setItem("quiz_draft_state", JSON.stringify(draftData));
         }
-    }, [title, description, startTime, endTime, questions, isMounted]);
+    }, [title, description, startTime, endTime, quizMode, questions, isMounted]);
 
     const addQuestion = () => {
         const newQuestion: Question = {
@@ -133,6 +135,73 @@ export default function CreateTestPage() {
         }));
     };
 
+    // 🔥 JSON IMPORT LOGIC
+    const handleJsonImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const json = JSON.parse(event.target?.result as string);
+
+                // Validate structure
+                if (!json.questions || !Array.isArray(json.questions) || json.questions.length === 0) {
+                    toast.error("Invalid JSON: 'questions' array is required and must not be empty.");
+                    return;
+                }
+
+                // Auto-fill title/description if present
+                if (json.title && !title) setTitle(json.title);
+                if (json.description && !description) setDescription(json.description);
+
+                // Parse questions
+                const importedQuestions: Question[] = json.questions.map((q: any) => ({
+                    id: Math.random().toString(36).substr(2, 9),
+                    text: q.text || "",
+                    imageUrl: q.imageUrl || undefined,
+                    type: q.type || "SINGLE_CORRECT",
+                    timeLimit: q.timeLimit || 60,
+                    timeUnit: (q.timeUnit as "SECONDS" | "MINUTES") || "SECONDS",
+                    marks: q.marks ?? 4,
+                    negative: q.negative ?? 1,
+                    correctAnswer: q.correctAnswer || undefined,
+                    options: q.options?.map((opt: any) => ({
+                        text: opt.text || "",
+                        isCorrect: opt.isCorrect || false
+                    })) || [
+                        { text: "", isCorrect: true },
+                        { text: "", isCorrect: false },
+                        { text: "", isCorrect: false },
+                        { text: "", isCorrect: false },
+                    ]
+                }));
+
+                // Merge or replace?
+                if (questions.length > 0) {
+                    const shouldReplace = confirm(
+                        `You already have ${questions.length} question(s). Replace them with ${importedQuestions.length} imported questions?\n\nClick OK to Replace, Cancel to Merge (append).`
+                    );
+                    if (shouldReplace) {
+                        setQuestions(importedQuestions);
+                    } else {
+                        setQuestions([...questions, ...importedQuestions]);
+                    }
+                } else {
+                    setQuestions(importedQuestions);
+                }
+
+                toast.success(`✅ Imported ${importedQuestions.length} questions successfully!`);
+            } catch (err) {
+                toast.error("Failed to parse JSON file. Please check the format.");
+                console.error("JSON Parse Error:", err);
+            }
+        };
+        reader.readAsText(file);
+        // Reset input so same file can be imported again
+        e.target.value = "";
+    };
+
     const handleSubmit = async () => {
         if (!title || !startTime || !endTime) return toast.error("Please fill title and timings!");
         if (questions.length === 0) return toast.error("Please add at least one question!");
@@ -153,7 +222,7 @@ export default function CreateTestPage() {
             timeLimit: q.timeUnit === "MINUTES" ? q.timeLimit * 60 : q.timeLimit,
         }));
 
-        const quizData = { title, description, startTime, endTime, questions: processedQuestions };
+        const quizData = { title, description, startTime, endTime, quizMode, questions: processedQuestions };
 
         const result = await createQuizAction(quizData);
 
@@ -173,10 +242,27 @@ export default function CreateTestPage() {
                 <div>
                     <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Create New Test</h1>
                 </div>
-                <Button onClick={handleSubmit} disabled={isSubmitting} className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 gap-2">
-                    {isSubmitting ? <span className="animate-spin">⏳</span> : <Save className="h-4 w-4" />}
-                    {isSubmitting ? "Saving..." : "Save & Generate Code"}
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                    {/* JSON Import Button */}
+                    <div className="relative">
+                        <input
+                            type="file"
+                            accept=".json,application/json"
+                            id="json-import-input"
+                            className="hidden"
+                            onChange={handleJsonImport}
+                        />
+                        <label htmlFor="json-import-input">
+                            <Button type="button" variant="outline" className="gap-2 cursor-pointer w-full border-purple-200 text-purple-700 hover:bg-purple-50" asChild>
+                                <span><FileJson className="h-4 w-4" /> Import JSON</span>
+                            </Button>
+                        </label>
+                    </div>
+                    <Button onClick={handleSubmit} disabled={isSubmitting} className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 gap-2">
+                        {isSubmitting ? <span className="animate-spin">⏳</span> : <Save className="h-4 w-4" />}
+                        {isSubmitting ? "Saving..." : "Save & Generate Code"}
+                    </Button>
+                </div>
             </div>
 
             <div className="space-y-6 md:space-y-8">
@@ -190,7 +276,7 @@ export default function CreateTestPage() {
                         <Label>Quiz Title <span className="text-red-500">*</span></Label>
                         <Input placeholder="e.g. Mid-Sem Data Structures" value={title} onChange={(e) => setTitle(e.target.value)} />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <Label>Start Time <span className="text-red-500">*</span></Label>
                             <Input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
@@ -198,6 +284,16 @@ export default function CreateTestPage() {
                         <div className="space-y-2">
                             <Label>End Time <span className="text-red-500">*</span></Label>
                             <Input type="datetime-local" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Quiz Mode</Label>
+                            <Select value={quizMode} onValueChange={(val: any) => setQuizMode(val)}>
+                                <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="NORMAL">Standard Exam</SelectItem>
+                                    <SelectItem value="LIVE_GUIDED">Live Guided (Menti-style)</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
                 </div>

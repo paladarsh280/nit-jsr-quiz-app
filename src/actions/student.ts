@@ -122,12 +122,12 @@ export async function submitExam(quizId: string, answersJson: string) {
 
             if (studentAns !== undefined && studentAns !== null && studentAns !== "") {
                 if (question.type === "SINGLE_CORRECT") {
-                    const correctOpt = question.options.find((o: any) => o.isCorrect);
+                    const correctOpt = question.options.find((o: any) => o.isCorrect); // eslint-disable-line @typescript-eslint/no-explicit-any
                     if (correctOpt && correctOpt.id === studentAns) isCorrect = true;
                     formattedOptions = [studentAns as string];
                 }
                 else if (question.type === "MULTI_CORRECT") {
-                    const correctOpts = question.options.filter((o: any) => o.isCorrect).map((o: any) => o.id);
+                    const correctOpts = question.options.filter((o: any) => o.isCorrect).map((o: any) => o.id); // eslint-disable-line @typescript-eslint/no-explicit-any
                     const studentOpts = studentAns as string[];
                     if (studentOpts.length === correctOpts.length && studentOpts.every(id => correctOpts.includes(id))) {
                         isCorrect = true;
@@ -135,7 +135,7 @@ export async function submitExam(quizId: string, answersJson: string) {
                     formattedOptions = studentOpts;
                 }
                 else if (question.type === "FILL_IN_BLANK" || question.type === "INTEGER_TYPE") {
-                    const exactAnswer = (question as any).correctAnswer;
+                    const exactAnswer = (question as any).correctAnswer; // eslint-disable-line @typescript-eslint/no-explicit-any
                     if (exactAnswer) {
                         const sanitizedStudentAns = String(studentAns).trim().toUpperCase().replace(/\s+/g, ' ');
                         const sanitizedExactAns = String(exactAnswer).trim().toUpperCase().replace(/\s+/g, ' ');
@@ -223,7 +223,7 @@ export async function getStudentHistory() {
         });
 
         return { success: true, attempts };
-    } catch (error) {
+    } catch {
         return { success: false, error: "Failed to fetch history." };
     }
 }
@@ -253,7 +253,129 @@ export async function getDetailedResultForPDF(quizId: string) {
         }
 
         return { success: true, quiz, attempt: quiz.attempts[0] };
-    } catch (error) {
+    } catch {
         return { success: false, error: "Failed to fetch PDF details." };
+    }
+}
+
+
+// 3. LIVE GUIDED MODE: Submit a single answer for one question with speed-based scoring
+export async function submitLiveAnswer(
+    quizId: string,
+    questionId: string,
+    answer: string, // optionId for MCQ, text for others
+    answerType: string, // SINGLE_CORRECT, MULTI_CORRECT, etc.
+    timeTaken: number // seconds taken to answer
+) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session || session.user.role !== "STUDENT") return { success: false, error: "Unauthorized" };
+        const studentId = session.user.id;
+
+        // Get the question details for evaluation
+        const question = await prisma.question.findUnique({
+            where: { id: questionId },
+            include: { options: true }
+        });
+        if (!question) return { success: false, error: "Question not found" };
+
+        // Evaluate correctness
+        let isCorrect = false;
+        let formattedTextResponse: string | null = null;
+        let formattedOptions: string[] = [];
+
+        if (answerType === "SINGLE_CORRECT") {
+            const correctOpt = question.options.find(o => o.isCorrect);
+            if (correctOpt && correctOpt.id === answer) isCorrect = true;
+            formattedOptions = [answer];
+        } else if (answerType === "MULTI_CORRECT") {
+            const selectedOpts = JSON.parse(answer) as string[];
+            const correctOpts = question.options.filter(o => o.isCorrect).map(o => o.id);
+            if (selectedOpts.length === correctOpts.length && selectedOpts.every(id => correctOpts.includes(id))) {
+                isCorrect = true;
+            }
+            formattedOptions = selectedOpts;
+        } else if (answerType === "FILL_IN_BLANK" || answerType === "INTEGER_TYPE") {
+            const exactAnswer = (question as any).correctAnswer; // eslint-disable-line @typescript-eslint/no-explicit-any
+            if (exactAnswer) {
+                const s1 = String(answer).trim().toUpperCase().replace(/\s+/g, ' ');
+                const s2 = String(exactAnswer).trim().toUpperCase().replace(/\s+/g, ' ');
+                if (s1 === s2) isCorrect = true;
+            }
+            formattedTextResponse = String(answer);
+        } else if (answerType === "DESCRIPTIVE") {
+            formattedTextResponse = String(answer);
+        }
+
+        // Speed-based scoring: bonus up to 50% of marks based on speed
+        let marksAwarded = 0;
+        if (isCorrect) {
+            const speedBonus = Math.floor((Math.max(0, question.timeLimit - timeTaken) / question.timeLimit) * question.marks * 0.5);
+            marksAwarded = question.marks + speedBonus;
+        } else if (answerType !== "DESCRIPTIVE") {
+            marksAwarded = -Math.abs(question.negative);
+        }
+
+        // Ensure StudentAttempt exists (create if first answer)
+        let attempt = await prisma.studentAttempt.findUnique({
+            where: { studentId_quizId: { studentId, quizId } }
+        });
+
+        if (!attempt) {
+            attempt = await prisma.studentAttempt.create({
+                data: { studentId, quizId, score: 0, isFinished: false }
+            });
+        }
+
+        // Upsert the answer (handles re-submission)
+        const existingAnswer = await prisma.studentAnswer.findUnique({
+            where: { attemptId_questionId: { attemptId: attempt.id, questionId } }
+        });
+
+        if (existingAnswer) {
+            // Update existing answer
+            await prisma.studentAnswer.update({
+                where: { id: existingAnswer.id },
+                data: {
+                    selectedOptions: formattedOptions,
+                    textResponse: formattedTextResponse,
+                    isCorrect,
+                    marksAwarded,
+                    timeTaken
+                }
+            });
+            // Recalculate total score
+            const allAnswers = await prisma.studentAnswer.findMany({
+                where: { attemptId: attempt.id }
+            });
+            const newTotal = allAnswers.reduce((sum, a) => sum + a.marksAwarded, 0);
+            await prisma.studentAttempt.update({
+                where: { id: attempt.id },
+                data: { score: newTotal }
+            });
+        } else {
+            // Create new answer
+            await prisma.studentAnswer.create({
+                data: {
+                    attemptId: attempt.id,
+                    questionId,
+                    selectedOptions: formattedOptions,
+                    textResponse: formattedTextResponse,
+                    isCorrect,
+                    marksAwarded,
+                    timeTaken
+                }
+            });
+            // Update total score
+            await prisma.studentAttempt.update({
+                where: { id: attempt.id },
+                data: { score: { increment: marksAwarded } }
+            });
+        }
+
+        return { success: true, isCorrect, marksAwarded };
+    } catch (error) {
+        console.error("Live Answer Error:", error);
+        return { success: false, error: "Failed to submit answer." };
     }
 }

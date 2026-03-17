@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PlayCircle, StopCircle, ArrowLeft, Loader2, Download, Users, BookOpen } from "lucide-react";
 import * as XLSX from "xlsx";
+import { QRCodeSVG } from "qrcode.react";
+
 export default function QuizDetailsPage() {
     const params = useParams();
     const router = useRouter();
@@ -106,23 +108,42 @@ export default function QuizDetailsPage() {
                     </div>
                 </div>
 
-                {/* Action Buttons (Live / End Test) */}
-                <div className="flex flex-col gap-3 w-full md:w-auto">
-                    {quiz.status === "DRAFT" && (
-                        <Button onClick={() => handleStatusChange("LIVE")} disabled={statusLoading} className="bg-green-600 hover:bg-green-700 w-full gap-2">
-                            {statusLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />} Start Test (Make Live)
-                        </Button>
-                    )}
-                    {quiz.status === "LIVE" && (
-                        <Button onClick={() => handleStatusChange("COMPLETED")} disabled={statusLoading} variant="destructive" className="w-full gap-2">
-                            {statusLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <StopCircle className="h-4 w-4" />} End Test
-                        </Button>
-                    )}
-                    {quiz.status === "COMPLETED" && (
-                        <Button disabled variant="secondary" className="w-full">
-                            Test Ended
-                        </Button>
-                    )}
+                {/* Right Side: QR Code & Actions */}
+                <div className="flex flex-col md:flex-row items-center gap-6 w-full md:w-auto">
+                    {/* QR Code */}
+                    <div className="flex flex-col items-center justify-center bg-gray-50 p-3 rounded-lg border hover:shadow-md transition-shadow">
+                        <QRCodeSVG 
+                            value={typeof window !== 'undefined' ? `${window.location.origin}/test/${quiz.id}` : ''} 
+                            size={120} 
+                            level="M" 
+                            includeMargin={false} 
+                        />
+                        <span className="text-xs text-gray-500 mt-2 font-semibold tracking-wide uppercase">Scan to Join</span>
+                    </div>
+
+                    {/* Action Buttons (Live / End Test) */}
+                    <div className="flex flex-col gap-3 w-full md:w-auto min-w-[200px]">
+                        {quiz.status === "DRAFT" && (
+                            <Button onClick={() => handleStatusChange("LIVE")} disabled={statusLoading} className="bg-green-600 hover:bg-green-700 w-full gap-2 h-11">
+                                {statusLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />} Start Test (Make Live)
+                            </Button>
+                        )}
+                        {quiz.status === "LIVE" && quiz.quizMode === "LIVE_GUIDED" && (
+                            <Button onClick={() => router.push(`/professor/live/${quiz.id}`)} className="bg-blue-600 hover:bg-blue-700 w-full gap-2 h-11">
+                                <PlayCircle className="h-4 w-4" /> Enter Live Room
+                            </Button>
+                        )}
+                        {quiz.status === "LIVE" && (
+                            <Button onClick={() => handleStatusChange("COMPLETED")} disabled={statusLoading} variant="destructive" className="w-full gap-2 h-11">
+                                {statusLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <StopCircle className="h-4 w-4" />} End Test
+                            </Button>
+                        )}
+                        {quiz.status === "COMPLETED" && (
+                            <Button disabled variant="secondary" className="w-full h-11">
+                                Test Ended
+                            </Button>
+                        )}
+                    </div>
                 </div>
             </div>
 

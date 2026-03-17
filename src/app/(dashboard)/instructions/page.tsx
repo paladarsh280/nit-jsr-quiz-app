@@ -59,49 +59,7 @@ export default function InstructionsPage() {
                             </CardContent>
                         </Card>
 
-                        {/* Anti-Cheat Policies */}
-                        <Card className="border-t-4 border-t-red-500 shadow-lg hover:shadow-xl transition-shadow bg-red-50/30">
-                            <CardContent className="p-6 md:p-8 space-y-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-12 w-12 bg-red-100 rounded-full flex items-center justify-center">
-                                        <ShieldAlert className="h-6 w-6 text-red-600" />
-                                    </div>
-                                    <h2 className="text-2xl font-bold text-red-800">Strict Anti-Cheat Rules</h2>
-                                </div>
 
-                                <div className="space-y-4">
-                                    <div className="bg-white p-4 rounded-xl border border-red-100 flex items-start gap-4 shadow-sm">
-                                        <EyeOff className="h-6 w-6 text-red-500 mt-1 flex-shrink-0" />
-                                        <div>
-                                            <h3 className="font-semibold text-gray-900">Focus Tracking & Tab Switching</h3>
-                                            <p className="text-sm text-gray-600 mt-1">
-                                                Opening new tabs, minimizing the browser, or opening background apps (like Windows Snipping Tool) triggers a <strong>Strike</strong>. If you receive exactly <strong>3 Strikes</strong>, your exam will instantly auto-submit with penalties applied.
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white p-4 rounded-xl border border-red-100 flex items-start gap-4 shadow-sm">
-                                        <FileWarning className="h-6 w-6 text-orange-500 mt-1 flex-shrink-0" />
-                                        <div>
-                                            <h3 className="font-semibold text-gray-900">Copy-Paste & Context Blockers</h3>
-                                            <p className="text-sm text-gray-600 mt-1">
-                                                To ensure fairness, Right-Click, `Ctrl+C`, `Ctrl+V`, and text highlighting are disabled inside the Exam Room. All answers must be manually typed or clicked.
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white p-4 rounded-xl border border-red-100 flex items-start gap-4 shadow-sm">
-                                        <Clock className="h-6 w-6 text-indigo-500 mt-1 flex-shrink-0" />
-                                        <div>
-                                            <h3 className="font-semibold text-gray-900">Disconnects & Refreshing</h3>
-                                            <p className="text-sm text-gray-600 mt-1">
-                                                If your browser reloads unexpectedly, do not panic. Your progress, timer, and current question are synced to your browser's local memory. The test will seamlessly resume.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
                     </div>
                 </TabsContent>
 

@@ -14,7 +14,7 @@ function generateQuizCode() {
     return code;
 }
 
-export async function createQuizAction(data: any) {
+export async function createQuizAction(data: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
     try {
         const session = await getServerSession(authOptions);
 
@@ -35,11 +35,12 @@ export async function createQuizAction(data: any) {
                 endTime: new Date(data.endTime),
                 code: uniqueCode,
                 professorId: professorId,
-                status: "DRAFT", // Ya tu isko LIVE bhi kar sakta hai time ke hisaab se
+                status: "DRAFT", 
+                quizMode: data.quizMode || "NORMAL",
 
                 // Nested create: Har question ko loop karke save karenge
                 questions: {
-                    create: data.questions.map((q: any) => ({
+                    create: data.questions.map((q: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
                         text: q.text,
                         imageUrl: q.imageUrl || null, // 🔥 Image aayegi toh theek, warna null
                         type: q.type,
@@ -51,7 +52,7 @@ export async function createQuizAction(data: any) {
                         // Options sirf tabhi save honge jab MCQ type ho
                         options: (q.type === "SINGLE_CORRECT" || q.type === "MULTI_CORRECT")
                             ? {
-                                create: q.options.map((opt: any) => ({
+                                create: q.options.map((opt: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
                                     text: opt.text,
                                     isCorrect: opt.isCorrect,
                                 }))
@@ -158,3 +159,93 @@ export async function updateQuizStatus(quizId: string, status: "DRAFT" | "LIVE" 
         return { success: false, error: "Failed to update status" };
     }
 }
+
+// 3. Live Guided Mode: Advance to the next question
+export async function updateActiveQuestionIndex(quizId: string, index: number) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session || session.user.role !== "PROFESSOR") return { success: false, error: "Unauthorized" };
+
+        await prisma.quiz.update({
+            where: { id: quizId, professorId: session.user.id },
+            data: { activeQuestionIndex: index }
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error(error);
+        return { success: false, error: "Failed to update active question" };
+    }
+}
+
+// 4. Get question statistics — how many chose each option
+export async function getQuestionStats(quizId: string, questionId: string) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session || session.user.role !== "PROFESSOR") return { success: false, error: "Unauthorized" };
+
+        const question = await prisma.question.findUnique({
+            where: { id: questionId },
+            include: { options: true }
+        });
+        if (!question) return { success: false, error: "Question not found" };
+
+        const answers = await prisma.studentAnswer.findMany({
+            where: { question: { id: questionId }, attempt: { quizId } }
+        });
+
+        // Count how many students chose each option
+        const optionCounts: Record<string, number> = {};
+        for (const opt of question.options) {
+            optionCounts[opt.id] = 0;
+        }
+        for (const ans of answers) {
+            for (const optId of ans.selectedOptions) {
+                if (optionCounts[optId] !== undefined) {
+                    optionCounts[optId]++;
+                }
+            }
+        }
+
+        const stats = question.options.map(opt => ({
+            id: opt.id,
+            text: opt.text,
+            isCorrect: opt.isCorrect,
+            count: optionCounts[opt.id] || 0
+        }));
+
+        return { success: true, stats, totalResponses: answers.length };
+    } catch (error) {
+        console.error(error);
+        return { success: false, error: "Failed to get question stats" };
+    }
+}
+
+// 5. Get leaderboard data for live quiz
+export async function getLeaderboardData(quizId: string) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session || session.user.role !== "PROFESSOR") return { success: false, error: "Unauthorized" };
+
+        const attempts = await prisma.studentAttempt.findMany({
+            where: { quizId },
+            include: {
+                student: { select: { name: true, email: true } }
+            },
+            orderBy: { score: 'desc' }
+        });
+
+        const leaderboard = attempts.map((a, idx) => ({
+            rank: idx + 1,
+            name: a.student.name || "Student",
+            email: a.student.email,
+            score: a.score,
+            isFinished: a.isFinished
+        }));
+
+        return { success: true, leaderboard };
+    } catch (error) {
+        console.error(error);
+        return { success: false, error: "Failed to get leaderboard" };
+    }
+}
