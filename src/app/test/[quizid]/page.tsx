@@ -11,6 +11,7 @@ import { Loader2, Timer, CheckCircle2, Maximize, Cloud, Hourglass, Trophy, Medal
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PremiumLoader } from "@/components/ui/PremiumLoader";
+import { supabase } from "@/lib/supabase";
 
 export default function ExamRoom() {
     const params = useParams();
@@ -69,7 +70,8 @@ export default function ExamRoom() {
                         } catch { /* ignore */ }
                     }
                     
-                    if (calculatedTimeLeft === 0) setWaitingForProfessor(true);
+                    // 🔥 FIX: Don't set waitingForProfessor on initial load (student hasn't even clicked Start yet)
+                    // The timer useEffect will handle this after student clicks "Join Live Quiz"
                 } else {
                     const savedState = localStorage.getItem(`exam_state_${quizId}`);
                     if (savedState) {
@@ -94,59 +96,130 @@ export default function ExamRoom() {
         fetchQuiz();
     }, [quizId, router]);
 
-    // Polling for LIVE_GUIDED mode — sync with professor
+    // Refs for volatile values used inside Realtime callback (avoids stale closures without causing re-subscriptions)
+    const currentIndexRef = useRef(currentIndex);
+    const waitingForProfessorRef = useRef(waitingForProfessor);
+    const timeLeftRef = useRef(timeLeft);
+    const quizRef = useRef(quiz);
+    useEffect(() => { currentIndexRef.current = currentIndex; }, [currentIndex]);
+    useEffect(() => { waitingForProfessorRef.current = waitingForProfessor; }, [waitingForProfessor]);
+    useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
+    useEffect(() => { quizRef.current = quiz; }, [quiz]);
+
+    // WebSockets via Supabase Realtime
+    // 🔥 FIX: Only depend on stable values (quizId, examFinished, isLiveGuided)
+    // We use refs for volatile state so the channel doesn't rebuild every second
     useEffect(() => {
         if (!quiz || !isLiveGuided || examFinished) return;
         
-        const interval = setInterval(async () => {
-            const res = await getQuizForStudent(quizId);
-            if (res.success && res.quiz) {
-                const newQuiz = res.quiz;
-                
-                // Check if professor advanced to next question
-                if ((newQuiz as any).activeQuestionIndex > currentIndex) {
-                    setCurrentIndex((newQuiz as any).activeQuestionIndex);
+        const channel = supabase
+            .channel(`quiz_changes_${quizId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'Quiz',
+                    filter: `id=eq.${quizId}`
+                },
+                (payload) => {
+                    const newQuiz = payload.new;
+                    const latestIndex = currentIndexRef.current;
+                    const latestWaiting = waitingForProfessorRef.current;
+                    const latestTimeLeft = timeLeftRef.current;
+                    const latestQuiz = quizRef.current;
                     
-                    // Reset states for the new question
-                    setLiveAnswerSubmitted(false);
-                    setLiveAnswerResult(null);
-                    setWaitingForProfessor(false);
-                    setLiveLeaderboard(null);
-                    setLeaderboardAnimStage(0);
-                    setQuestionStartTime(Date.now());
-                    
-                    // 🔥 Restart exact timer synchronization based on the latest update
-                    const elapsedSec = Math.floor((Date.now() - new Date(newQuiz.updatedAt).getTime()) / 1000);
-                    const calculatedTimeLeft = Math.max(0, (newQuiz.questions[(newQuiz as any).activeQuestionIndex]?.timeLimit || 30) - elapsedSec);
-                    setTimeLeft(calculatedTimeLeft);
-                } else if (isLiveGuided && !waitingForProfessor) {
-                    // Continuous tight sync for late joiners or tab sleepers
-                    const elapsedSec = Math.floor((Date.now() - new Date(newQuiz.updatedAt).getTime()) / 1000);
-                    const calculatedTimeLeft = Math.max(0, (newQuiz.questions[(newQuiz as any).activeQuestionIndex]?.timeLimit || 30) - elapsedSec);
-                    
-                    // Apply synchronization only if it has drifted significantly (>2 seconds) to avoid jitter
-                    if (Math.abs(timeLeft - calculatedTimeLeft) > 2) {
+                    // Check if professor advanced to next question
+                    if (newQuiz.activeQuestionIndex > latestIndex) {
+                        setCurrentIndex(newQuiz.activeQuestionIndex);
+                        setLiveAnswerSubmitted(false);
+                        setLiveAnswerResult(null);
+                        setWaitingForProfessor(false);
+                        setLiveLeaderboard(null);
+                        setLeaderboardAnimStage(0);
+                        setQuestionStartTime(Date.now());
+                        
+                        const elapsedSec = Math.floor((Date.now() - new Date(newQuiz.updatedAt).getTime()) / 1000);
+                        const newTimeLimit = latestQuiz?.questions[newQuiz.activeQuestionIndex]?.timeLimit || 30;
+                        const calculatedTimeLeft = Math.max(1, newTimeLimit - elapsedSec);
                         setTimeLeft(calculatedTimeLeft);
+                    } else if (!latestWaiting) {
+                        // Tight sync for late joiners
+                        const elapsedSec = Math.floor((Date.now() - new Date(newQuiz.updatedAt).getTime()) / 1000);
+                        const newTimeLimit = latestQuiz?.questions[newQuiz.activeQuestionIndex]?.timeLimit || 30;
+                        const calculatedTimeLeft = Math.max(0, newTimeLimit - elapsedSec);
+                        if (Math.abs(latestTimeLeft - calculatedTimeLeft) > 2) {
+                            setTimeLeft(calculatedTimeLeft);
+                        }
                     }
-                }
-                
-                // Check if quiz ended
-                if (newQuiz.status === "COMPLETED" && !examFinished) {
-                    toast.info("The Professor has ended the quiz. Auto-submitting...");
-                    setExamFinished(true);
-                    localStorage.removeItem(`exam_state_${quizId}`);
                     
-                    // Always redirect to dashboard when test ends
-                    setTimeout(() => router.push("/student"), 2000);
+                    // Check if quiz ended
+                    if (newQuiz.status === "COMPLETED") {
+                        toast.info("The Professor has ended the quiz.");
+                        setExamFinished(true);
+                        localStorage.removeItem(`exam_state_${quizId}`);
+                        setTimeout(() => router.push("/student"), 2000);
+                    }
+
+                    setQuiz((prev: any) => ({ ...prev, ...newQuiz }));
                 }
+            )
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ Realtime connected for Quiz', quizId);
+                } else if (status === 'CHANNEL_ERROR') {
+                    console.error('❌ Realtime channel error for Quiz', quizId);
+                }
+            });
 
-                setQuiz(newQuiz);
+        return () => {
+            supabase.removeChannel(channel);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [quizId, examFinished, isLiveGuided]);
+
+    // 🔥 POLLING FALLBACK: When student is waiting for professor's next question,
+    // poll every 3 seconds in case Realtime event was missed
+    useEffect(() => {
+        if (!isLiveGuided || !hasStarted || !waitingForProfessor || examFinished) return;
+
+        const poll = async () => {
+            const res = await getQuizForStudent(quizId);
+            if (!res.success || !res.quiz) return;
+            const fetchedQuiz = res.quiz as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+            if (fetchedQuiz.status === "COMPLETED") {
+                toast.info("The Professor has ended the quiz.");
+                setExamFinished(true);
+                localStorage.removeItem(`exam_state_${quizId}`);
+                setTimeout(() => router.push("/student"), 2000);
+                return;
             }
-        }, 2000);
 
+            if (fetchedQuiz.activeQuestionIndex > currentIndexRef.current) {
+                // Professor advanced — sync up!
+                const newIndex = fetchedQuiz.activeQuestionIndex;
+                const elapsedSec = Math.floor((Date.now() - new Date(fetchedQuiz.updatedAt).getTime()) / 1000);
+                const newTimeLimit = fetchedQuiz.questions[newIndex]?.timeLimit || 30;
+                const calculatedTimeLeft = Math.max(1, newTimeLimit - elapsedSec);
+
+                setQuiz(fetchedQuiz);
+                setCurrentIndex(newIndex);
+                setLiveAnswerSubmitted(false);
+                setLiveAnswerResult(null);
+                setWaitingForProfessor(false);
+                setLiveLeaderboard(null);
+                setLeaderboardAnimStage(0);
+                setQuestionStartTime(Date.now());
+                setTimeLeft(calculatedTimeLeft);
+                toast.success(`Question ${newIndex + 1} is live!`);
+            }
+        };
+
+        const interval = setInterval(poll, 3000);
         return () => clearInterval(interval);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [quizId, currentIndex, examFinished, isLiveGuided]);
+    }, [quizId, isLiveGuided, hasStarted, waitingForProfessor, examFinished]);
 
     // Save state to LocalStorage continuously
     useEffect(() => {

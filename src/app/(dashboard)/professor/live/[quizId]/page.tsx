@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getQuizStats, updateActiveQuestionIndex, updateQuizStatus, getQuestionStats as fetchQuestionStats } from "@/actions/professor";
 import { toast } from "sonner";
@@ -25,10 +25,24 @@ export default function LiveGuidedRoom() {
     const [leaderboardAnimStage, setLeaderboardAnimStage] = useState(0); // 0=none, 1=3rd, 2=2nd, 3=1st, 4=full
     const [statusLoading, setStatusLoading] = useState(false);
 
+    // 🔥 Refs for preventing double-advance and protecting optimistic updates from polling
+    const isAdvancingRef = useRef(false);        // True during advance — blocks handleTimeUp + extra clicks
+    const minExpectedIndexRef = useRef(0);        // Polling never reverts below this index
+
     const fetchQuiz = useCallback(async () => {
         const res = await getQuizStats(quizId);
         if (res.success) {
-            setQuiz(res.quiz);
+            setQuiz((prev: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+                const fetched = res.quiz as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+                // 🔥 FIX: Never let polling revert activeQuestionIndex backward.
+                // This protects our optimistic update when the DB hasn't committed yet.
+                if (fetched.activeQuestionIndex < minExpectedIndexRef.current) {
+                    return { ...fetched, activeQuestionIndex: minExpectedIndexRef.current };
+                }
+                // Once DB matches or exceeds, update minExpected to stay in sync
+                minExpectedIndexRef.current = fetched.activeQuestionIndex;
+                return fetched;
+            });
         } else {
             toast.error(res.error);
             router.push("/professor");
@@ -70,7 +84,7 @@ export default function LiveGuidedRoom() {
             const timer = setInterval(() => {
                 const elapsedSec = Math.floor((Date.now() - new Date(quiz.updatedAt).getTime()) / 1000);
                 const calculatedTimeLeft = Math.max(0, currentQ.timeLimit - elapsedSec);
-                
+
                 setTimeLeft(calculatedTimeLeft);
 
                 if (calculatedTimeLeft === 0) {
@@ -95,18 +109,18 @@ export default function LiveGuidedRoom() {
     }, [phase, leaderboardAnimStage, questionStats, quiz]);
 
     const handleTimeUp = async () => {
-        if (!quiz) return;
+        if (!quiz || isAdvancingRef.current) return; // 🔥 Use ref (not state) for guaranteed up-to-date check
         const currentQ = quiz.questions[quiz.activeQuestionIndex];
-        
+
         // Fetch question stats
         const statsRes = await fetchQuestionStats(quizId, currentQ.id);
         if (statsRes.success) {
             setQuestionStats(statsRes);
         }
-        
+
         // Show stats first, then animate leaderboard
         setPhase("stats");
-        
+
         // After 3 seconds of stats, switch to leaderboard animation
         setTimeout(() => {
             setPhase("leaderboard");
@@ -125,28 +139,50 @@ export default function LiveGuidedRoom() {
 
     const handleNextQuestion = async () => {
         if (!quiz) return;
+        // 🔥 Use ref for immediate lock — state update is async and could allow a second click
+        if (isAdvancingRef.current) return;
         if (quiz.activeQuestionIndex >= quiz.questions.length - 1) {
             toast.info("This is the last question.");
             return;
         }
 
+        // Lock immediately via ref (synchronous) AND state (for UI disabled styling)
+        isAdvancingRef.current = true;
         setIsAdvancing(true);
+
         const nextIndex = quiz.activeQuestionIndex + 1;
+
+        // Set the minimum expected index so polling can't revert below this
+        minExpectedIndexRef.current = nextIndex;
+
+        // Optimistic update: update quiz state immediately with correct index + timestamp
+        // so the timer useEffect gets fresh data and doesn't fire timeLeft=0 instantly
+        const nowIso = new Date().toISOString();
+        setQuiz((prev: any) => ({ ...prev, activeQuestionIndex: nextIndex, updatedAt: nowIso })); // eslint-disable-line @typescript-eslint/no-explicit-any
+        setPhase("question");
+        setQuestionStats(null);
+        setLeaderboardAnimStage(0);
+        setTimeLeft(quiz.questions[nextIndex]?.timeLimit || 30);
+
         const res = await updateActiveQuestionIndex(quiz.id, nextIndex);
         if (res.success) {
-            // Clear local storage for the new question
             localStorage.removeItem(`prof_state_${quiz.id}`);
-            
-            setPhase("question");
-            setQuestionStats(null);
-            setLeaderboardAnimStage(0);
-            setTimeLeft(quiz.questions[nextIndex].timeLimit);
-            toast.success(`Advanced to Question ${nextIndex + 1}`);
-            fetchQuiz();
+            toast.success(`Q${nextIndex + 1} is live!`);
+            // Don't call fetchQuiz here — let the 2s polling sync naturally.
+            // Calling it manually could race with the optimistic update.
         } else {
             toast.error("Failed to advance question.");
+            // Rollback
+            minExpectedIndexRef.current = nextIndex - 1;
+            setQuiz((prev: any) => ({ ...prev, activeQuestionIndex: nextIndex - 1 })); // eslint-disable-line @typescript-eslint/no-explicit-any
+            setPhase("leaderboard");
         }
-        setIsAdvancing(false);
+
+        // Keep locked for 1 extra second to prevent accidental double-tap
+        setTimeout(() => {
+            isAdvancingRef.current = false;
+            setIsAdvancing(false);
+        }, 1000);
     };
 
     const handleSkipQuestion = async () => {
@@ -178,7 +214,7 @@ export default function LiveGuidedRoom() {
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col p-4 md:p-8 select-none">
-            
+
             {/* Header */}
             <header className="flex flex-wrap justify-between items-center bg-white p-4 rounded-xl border shadow-sm mb-6 gap-4">
                 <div className="flex items-center gap-4">
@@ -194,7 +230,7 @@ export default function LiveGuidedRoom() {
                 <div className="flex items-center gap-4">
                     <div className="text-center">
                         <span className="text-xs text-gray-500 font-semibold uppercase block">Students</span>
-                        <span className="text-xl font-bold text-blue-700 flex items-center justify-center gap-1"><Users className="h-5 w-5"/> {quiz.attempts.length}</span>
+                        <span className="text-xl font-bold text-blue-700 flex items-center justify-center gap-1"><Users className="h-5 w-5" /> {quiz.attempts.length}</span>
                     </div>
                     <Button onClick={handleEndQuiz} disabled={statusLoading} variant="destructive" size="sm" className="gap-2">
                         <StopCircle className="h-4 w-4" /> End Quiz
@@ -203,7 +239,7 @@ export default function LiveGuidedRoom() {
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
-                
+
                 {/* Left Column: Main Stage */}
                 <div className="lg:col-span-2 flex flex-col gap-6 h-full">
                     {/* QR Code Banner */}
@@ -222,14 +258,14 @@ export default function LiveGuidedRoom() {
                     {/* Main Stage Content */}
                     <Card className="flex-1 shadow-md border-t-8 border-t-blue-600 flex flex-col overflow-hidden">
                         <CardContent className="p-6 md:p-10 flex flex-col justify-center flex-1 text-center relative min-h-[400px]">
-                            
+
                             {/* PHASE 1: Question */}
                             {phase === "question" && currentQ && (
                                 <div className="space-y-6 animate-in fade-in duration-300">
                                     <Badge variant="outline" className="px-4 py-1.5 text-base border-blue-200 text-blue-800 bg-blue-50">
                                         Question {activeIndex + 1} of {quiz.questions.length}
                                     </Badge>
-                                    
+
                                     <h2 className="text-3xl md:text-5xl font-medium text-gray-900 leading-tight whitespace-pre-wrap">
                                         {currentQ.text}
                                     </h2>
@@ -250,9 +286,8 @@ export default function LiveGuidedRoom() {
                                     )}
 
                                     {/* Timer */}
-                                    <div className={`absolute bottom-6 right-6 flex items-center gap-3 px-6 py-3 rounded-full font-mono text-2xl font-bold border-2 shadow-sm transition-all ${
-                                        timeLeft <= 5 ? 'bg-red-50 text-red-600 border-red-200 animate-pulse scale-110' : 'bg-blue-50 text-blue-600 border-blue-200'
-                                    }`}>
+                                    <div className={`absolute bottom-6 right-6 flex items-center gap-3 px-6 py-3 rounded-full font-mono text-2xl font-bold border-2 shadow-sm transition-all ${timeLeft <= 5 ? 'bg-red-50 text-red-600 border-red-200 animate-pulse scale-110' : 'bg-blue-50 text-blue-600 border-blue-200'
+                                        }`}>
                                         <Timer className="h-6 w-6" /> {timeLeft}s
                                     </div>
                                 </div>
@@ -264,7 +299,7 @@ export default function LiveGuidedRoom() {
                                     <BarChart3 className="h-16 w-16 text-purple-600 mx-auto" />
                                     <h3 className="text-3xl font-black text-gray-800">Question Statistics</h3>
                                     <p className="text-gray-500">{questionStats.totalResponses} student(s) answered</p>
-                                    
+
                                     {/* Bar Chart for Options */}
                                     <div className="max-w-lg mx-auto space-y-3">
                                         {questionStats.stats?.map((stat: any, idx: number) => {
@@ -275,9 +310,8 @@ export default function LiveGuidedRoom() {
                                                     <span className="text-lg font-bold w-8 text-gray-600">{String.fromCharCode(65 + idx)}</span>
                                                     <div className="flex-1 bg-gray-100 rounded-full h-10 relative overflow-hidden">
                                                         <div
-                                                            className={`h-full rounded-full transition-all duration-1000 ease-out flex items-center px-4 ${
-                                                                stat.isCorrect ? 'bg-green-500' : 'bg-blue-400'
-                                                            }`}
+                                                            className={`h-full rounded-full transition-all duration-1000 ease-out flex items-center px-4 ${stat.isCorrect ? 'bg-green-500' : 'bg-blue-400'
+                                                                }`}
                                                             style={{ width: `${Math.max(percentage, 8)}%` }}
                                                         >
                                                             <span className="text-white font-bold text-sm">{stat.count}</span>
@@ -303,7 +337,7 @@ export default function LiveGuidedRoom() {
                                 <div className="space-y-6 animate-in fade-in duration-500">
                                     <Trophy className="h-16 w-16 text-yellow-500 mx-auto" />
                                     <h3 className="text-3xl font-black text-gray-800">🏆 Leaderboard</h3>
-                                    
+
                                     {/* Top 3 Podium Animation */}
                                     <div className="flex items-end justify-center gap-4 h-48 max-w-md mx-auto mt-4">
                                         {/* 2nd Place */}
@@ -315,7 +349,7 @@ export default function LiveGuidedRoom() {
                                                 <div className="h-full flex items-center justify-center text-2xl font-black text-white">2</div>
                                             </div>
                                         </div>
-                                        
+
                                         {/* 1st Place */}
                                         <div className={`flex flex-col items-center transition-all duration-700 ease-out ${leaderboardAnimStage >= 3 ? 'opacity-100 translate-y-0 scale-110' : 'opacity-0 translate-y-10'}`}>
                                             <Trophy className="h-10 w-10 text-yellow-500 mb-2" />
@@ -325,7 +359,7 @@ export default function LiveGuidedRoom() {
                                                 <div className="h-full flex items-center justify-center text-3xl font-black text-white">1</div>
                                             </div>
                                         </div>
-                                        
+
                                         {/* 3rd Place */}
                                         <div className={`flex flex-col items-center transition-all duration-700 ease-out ${leaderboardAnimStage >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
                                             <Medal className="h-7 w-7 text-amber-600 mb-2" />
@@ -340,13 +374,13 @@ export default function LiveGuidedRoom() {
                             )}
                         </CardContent>
                     </Card>
-                    
+
                     {/* Controls */}
                     <div className="flex justify-between items-center pt-2 gap-4">
                         {/* Skip Button */}
                         {phase === "question" && (
-                            <Button 
-                                variant="outline" 
+                            <Button
+                                variant="outline"
                                 onClick={handleSkipQuestion}
                                 className="gap-2 text-orange-600 border-orange-200 hover:bg-orange-50"
                             >
@@ -357,16 +391,27 @@ export default function LiveGuidedRoom() {
 
                         {/* Next Question */}
                         {!isLastQuestion ? (
-                            <Button 
-                                size="lg" 
-                                onClick={handleNextQuestion} 
-                                disabled={phase === "question" || isAdvancing} 
-                                className={`text-xl px-10 py-8 rounded-2xl gap-3 shadow-lg transition-all ${phase !== "question" ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                            <Button
+                                size="lg"
+                                onClick={handleNextQuestion}
+                                disabled={phase === "question" || isAdvancing || phase === "stats" || (phase === "leaderboard" && leaderboardAnimStage < 4)}
+                                className={`text-xl px-10 py-8 rounded-2xl gap-3 shadow-lg transition-all ${phase === "question" || phase === "stats" || (phase === "leaderboard" && leaderboardAnimStage < 4)
+                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                        : isAdvancing
+                                            ? 'bg-blue-400 text-white cursor-wait'
+                                            : 'bg-green-600 hover:bg-green-700 text-white'
+                                    }`}
                             >
-                                Next Question <ChevronRight className="h-6 w-6" />
+                                {phase === "stats" ? (
+                                    <>{"Calculating..."} <BarChart3 className="h-6 w-6 animate-pulse" /></>
+                                ) : phase === "leaderboard" && leaderboardAnimStage < 4 ? (
+                                    <>{"Leaderboard..."} <Trophy className="h-6 w-6 animate-pulse" /></>
+                                ) : (
+                                    <>Next Question <ChevronRight className="h-6 w-6" /></>
+                                )}
                             </Button>
                         ) : (
-                            <Button size="lg" disabled={phase === "question"} onClick={handleEndQuiz} className="text-xl px-10 py-8 rounded-2xl bg-red-600 hover:bg-red-700 gap-3 shadow-lg">
+                            <Button size="lg" disabled={phase === "question" || phase === "stats" || (phase === "leaderboard" && leaderboardAnimStage < 4)} onClick={handleEndQuiz} className="text-xl px-10 py-8 rounded-2xl bg-red-600 hover:bg-red-700 gap-3 shadow-lg">
                                 <StopCircle className="h-6 w-6" /> Finish Quiz
                             </Button>
                         )}
@@ -383,14 +428,12 @@ export default function LiveGuidedRoom() {
                             <div className="text-center text-gray-400 py-10">No attempts yet.</div>
                         ) : (
                             sortedAttempts.map((attempt: any, idx: number) => (
-                                <div key={attempt.id} className={`flex items-center gap-3 bg-white p-3 rounded-xl border hover:shadow-sm transition-all ${
-                                    phase === "leaderboard" && leaderboardAnimStage >= 4 ? 'animate-in fade-in slide-in-from-right duration-300' : ''
-                                }`} style={{ animationDelay: `${idx * 80}ms` }}>
-                                    <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                                        idx === 0 ? 'bg-yellow-100 text-yellow-700' : 
-                                        idx === 1 ? 'bg-gray-200 text-gray-700' : 
-                                        idx === 2 ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-600'
-                                    }`}>
+                                <div key={attempt.id} className={`flex items-center gap-3 bg-white p-3 rounded-xl border hover:shadow-sm transition-all ${phase === "leaderboard" && leaderboardAnimStage >= 4 ? 'animate-in fade-in slide-in-from-right duration-300' : ''
+                                    }`} style={{ animationDelay: `${idx * 80}ms` }}>
+                                    <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-sm ${idx === 0 ? 'bg-yellow-100 text-yellow-700' :
+                                            idx === 1 ? 'bg-gray-200 text-gray-700' :
+                                                idx === 2 ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-600'
+                                        }`}>
                                         #{idx + 1}
                                     </div>
                                     <div className="flex-1 min-w-0">

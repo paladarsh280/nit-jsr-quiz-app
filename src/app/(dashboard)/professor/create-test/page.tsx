@@ -40,7 +40,7 @@ export default function CreateTestPage() {
     const [description, setDescription] = useState("");
     const [startTime, setStartTime] = useState("");
     const [endTime, setEndTime] = useState("");
-    const [quizMode, setQuizMode] = useState<"NORMAL" | "LIVE_GUIDED">("NORMAL");
+    const [quizMode, setQuizMode] = useState<"NORMAL" | "LIVE_GUIDED">("LIVE_GUIDED");
     const [questions, setQuestions] = useState<Question[]>([]);
     const [isMounted, setIsMounted] = useState(false);
 
@@ -170,11 +170,11 @@ export default function CreateTestPage() {
                         text: opt.text || "",
                         isCorrect: opt.isCorrect || false
                     })) || [
-                        { text: "", isCorrect: true },
-                        { text: "", isCorrect: false },
-                        { text: "", isCorrect: false },
-                        { text: "", isCorrect: false },
-                    ]
+                            { text: "", isCorrect: true },
+                            { text: "", isCorrect: false },
+                            { text: "", isCorrect: false },
+                            { text: "", isCorrect: false },
+                        ]
                 }));
 
                 // Merge or replace?
@@ -290,8 +290,9 @@ export default function CreateTestPage() {
                             <Select value={quizMode} onValueChange={(val: any) => setQuizMode(val)}>
                                 <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="NORMAL">Standard Exam</SelectItem>
                                     <SelectItem value="LIVE_GUIDED">Live Guided (Menti-style)</SelectItem>
+                                    <SelectItem value="NORMAL">Standard Exam</SelectItem>
+
                                 </SelectContent>
                             </Select>
                         </div>

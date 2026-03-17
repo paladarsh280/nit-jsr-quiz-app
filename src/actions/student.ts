@@ -74,7 +74,8 @@ export async function getQuizForStudent(quizId: string) {
                     select: {
                         id: true, text: true, imageUrl: true, type: true, timeLimit: true, marks: true, negative: true,
                         options: { select: { id: true, text: true } }
-                    }
+                    },
+                    orderBy: { createdAt: 'asc' } // 🔥 FIX: questions order consistent rakho warna activeQuestionIndex galat question point karta
                 }
             }
         });

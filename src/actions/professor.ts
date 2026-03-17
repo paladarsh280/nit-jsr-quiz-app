@@ -118,7 +118,9 @@ export async function getQuizStats(quizId: string) {
         const quiz = await prisma.quiz.findUnique({
             where: { id: quizId, professorId: session.user.id },
             include: {
-                questions: true,
+                questions: {
+                    orderBy: { createdAt: 'asc' } // 🔥 FIX: Same order as student side to keep activeQuestionIndex consistent
+                },
                 attempts: {
                     include: {
                         student: {
