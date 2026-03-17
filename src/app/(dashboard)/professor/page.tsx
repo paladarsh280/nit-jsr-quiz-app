@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CalendarClock, Users, BookOpen, PlusCircle, Activity, BarChart, Copy } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 // Server Component: Yeh page load hote hi direct Database se data le aayega
 export default async function ProfessorDashboard() {
     const result = await getProfessorQuizzes();

@@ -1,6 +1,8 @@
 // src/app/(dashboard)/student/page.tsx
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
