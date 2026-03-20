@@ -13,6 +13,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { PremiumLoader } from "@/components/ui/PremiumLoader";
 import { supabase } from "@/lib/supabase";
 
+// 🔥 Safe UTC timestamp helper: handles both Date objects (from Prisma/server actions)
+// and raw strings from Supabase Realtime payloads (which often lack the 'Z' suffix).
+function toUTCMs(val: Date | string | unknown): number {
+    if (val instanceof Date) return val.getTime();
+    const s = String(val);
+    // If already has timezone info (Z or ±HH:MM), parse as-is. Otherwise append Z.
+    return new Date(/Z|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z').getTime();
+}
+
 export default function ExamRoom() {
     const params = useParams();
     const router = useRouter();
@@ -53,11 +62,8 @@ export default function ExamRoom() {
                 if (res.quiz.quizMode === "LIVE_GUIDED") {
                     setCurrentIndex((res.quiz as any).activeQuestionIndex);
                     
-                    // 🔥 Sync timer using the server's updatedAt timestamp
-                    // Normalize to UTC so the timer calculation is timezone-safe
-                    const rawUpdatedAt = res.quiz.updatedAt as unknown as string;
-                    const updatedAtUTC = rawUpdatedAt.endsWith('Z') ? rawUpdatedAt : rawUpdatedAt + 'Z';
-                    const elapsedSec = Math.floor((Date.now() - new Date(updatedAtUTC).getTime()) / 1000);
+                    // Sync timer using the server's updatedAt timestamp (UTC-safe)
+                    const elapsedSec = Math.floor((Date.now() - toUTCMs(res.quiz.updatedAt)) / 1000);
                     const calculatedTimeLeft = Math.max(0, (res.quiz.questions[(res.quiz as any).activeQuestionIndex]?.timeLimit || 30) - elapsedSec);
                     setTimeLeft(calculatedTimeLeft);
                     
@@ -142,21 +148,14 @@ export default function ExamRoom() {
                         setLeaderboardAnimStage(0);
                         setQuestionStartTime(Date.now());
                         
-                        // 🔥 FIX: Supabase Realtime payloads return timestamps without 'Z' suffix,
-                        // causing the browser to parse them as local time instead of UTC.
-                        // Appending 'Z' forces correct UTC interpretation.
-                        const rawUpdatedAt = newQuiz.updatedAt as string;
-                        const updatedAtUTC = rawUpdatedAt.endsWith('Z') ? rawUpdatedAt : rawUpdatedAt + 'Z';
-                        const elapsedSec = Math.floor((Date.now() - new Date(updatedAtUTC).getTime()) / 1000);
+                        // Professor advanced — sync up
+                        const elapsedSec = Math.floor((Date.now() - toUTCMs(newQuiz.updatedAt)) / 1000);
                         const newTimeLimit = latestQuiz?.questions[newQuiz.activeQuestionIndex]?.timeLimit || 30;
                         const calculatedTimeLeft = Math.max(1, newTimeLimit - elapsedSec);
                         setTimeLeft(calculatedTimeLeft);
                     } else if (!latestWaiting) {
                         // Tight sync for late joiners
-                        // 🔥 FIX: Normalize updatedAt to UTC before parsing
-                        const rawUpdatedAt2 = newQuiz.updatedAt as string;
-                        const updatedAtUTC2 = rawUpdatedAt2.endsWith('Z') ? rawUpdatedAt2 : rawUpdatedAt2 + 'Z';
-                        const elapsedSec = Math.floor((Date.now() - new Date(updatedAtUTC2).getTime()) / 1000);
+                        const elapsedSec = Math.floor((Date.now() - toUTCMs(newQuiz.updatedAt)) / 1000);
                         const newTimeLimit = latestQuiz?.questions[newQuiz.activeQuestionIndex]?.timeLimit || 30;
                         const calculatedTimeLeft = Math.max(0, newTimeLimit - elapsedSec);
                         if (Math.abs(latestTimeLeft - calculatedTimeLeft) > 2) {
@@ -189,25 +188,24 @@ export default function ExamRoom() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [quizId, examFinished, isLiveGuided]);
 
-    // 🔥 POLLING FALLBACK: Poll every 3 seconds once the student has started the quiz.
-    // This catches:
-    //  1. Professor ending the quiz while the student timer is still running (Realtime miss)
-    //  2. Professor advancing to next question while student is in "waiting" state
-    // We always poll when live — not just when waitingForProfessor.
+    // POLLING FALLBACK: Poll every 3 seconds once the student has started the quiz.
+    // This catches: professor ending quiz while timer is still running (Realtime miss)
+    // and professor advancing question while student is in "waiting" state.
     useEffect(() => {
         if (!isLiveGuided || !hasStarted || examFinished) return;
 
         const poll = async () => {
             const res = await getQuizForStudent(quizId);
             if (!res.success || !res.quiz) {
-                // 🔥 FIX: If the quiz is no longer found (e.g., status is COMPLETED),
-                // getQuizForStudent returns an error. Treat this as quiz ended.
+                // Only redirect if the quiz is definitively gone (COMPLETED/not found).
+                // Do NOT redirect on transient errors to avoid kicking students out.
                 if (res.error === "Quiz not available or ended.") {
                     toast.info("The Professor has ended the quiz.");
                     setExamFinished(true);
                     localStorage.removeItem(`exam_state_${quizId}`);
                     setTimeout(() => router.push("/student"), 2000);
                 }
+                // All other errors (network, auth) are silently ignored — next poll will retry
                 return;
             }
             const fetchedQuiz = res.quiz as any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -221,12 +219,8 @@ export default function ExamRoom() {
             }
 
             if (fetchedQuiz.activeQuestionIndex > currentIndexRef.current) {
-                // Professor advanced — sync up!
                 const newIndex = fetchedQuiz.activeQuestionIndex;
-                // 🔥 FIX: Normalize to UTC before parsing to get correct elapsed time
-                const rawUpdatedAt = fetchedQuiz.updatedAt as string;
-                const updatedAtUTC = rawUpdatedAt.endsWith('Z') ? rawUpdatedAt : rawUpdatedAt + 'Z';
-                const elapsedSec = Math.floor((Date.now() - new Date(updatedAtUTC).getTime()) / 1000);
+                const elapsedSec = Math.floor((Date.now() - toUTCMs(fetchedQuiz.updatedAt)) / 1000);
                 const newTimeLimit = fetchedQuiz.questions[newIndex]?.timeLimit || 30;
                 const calculatedTimeLeft = Math.max(1, newTimeLimit - elapsedSec);
 

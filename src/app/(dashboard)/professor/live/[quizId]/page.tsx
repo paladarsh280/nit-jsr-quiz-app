@@ -11,6 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, PlayCircle, Users, CheckCircle2, ChevronRight, Timer, BarChart3, SkipForward, StopCircle, Trophy, Medal } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
+// Safe UTC timestamp helper: handles both Date objects (from Prisma/server actions)
+// and raw strings from Supabase Realtime payloads (which often lack the 'Z' suffix).
+function toUTCMs(val: Date | string | unknown): number {
+    if (val instanceof Date) return val.getTime();
+    const s = String(val);
+    return new Date(/Z|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z').getTime();
+}
+
 export default function LiveGuidedRoom() {
     const params = useParams();
     const router = useRouter();
@@ -82,9 +90,9 @@ export default function LiveGuidedRoom() {
 
         if (phase === "question") {
             const timer = setInterval(() => {
-                const rawUpdatedAt = quiz.updatedAt as string;
-                const updatedAtUTC = rawUpdatedAt.endsWith('Z') ? rawUpdatedAt : rawUpdatedAt + 'Z';
-                const elapsedSec = Math.floor((Date.now() - new Date(updatedAtUTC).getTime()) / 1000);
+                // Use toUTCMs so this works whether quiz.updatedAt is a Date (server action)
+                // or a string (after Realtime update via setQuiz merge)
+                const elapsedSec = Math.floor((Date.now() - toUTCMs(quiz.updatedAt)) / 1000);
                 const calculatedTimeLeft = Math.max(0, currentQ.timeLimit - elapsedSec);
 
                 setTimeLeft(calculatedTimeLeft);
@@ -93,7 +101,7 @@ export default function LiveGuidedRoom() {
                     clearInterval(timer);
                     handleTimeUp();
                 }
-            }, 500); // 500ms for tighter accuracy
+            }, 500);
             return () => clearInterval(timer);
         }
     }, [quiz?.activeQuestionIndex, phase, quiz?.updatedAt]);
