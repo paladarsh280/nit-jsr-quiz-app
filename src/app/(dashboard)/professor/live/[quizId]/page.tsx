@@ -55,12 +55,24 @@ export default function LiveGuidedRoom() {
                 // Once DB matches or exceeds, update minExpected to stay in sync
                 minExpectedIndexRef.current = fetched.activeQuestionIndex;
 
-                // 🔥 On INITIAL load only: sync questionStartTime from the DB's updatedAt.
+                // On INITIAL load only: sync questionStartTime from the DB's updatedAt.
                 // On subsequent polls, we NEVER touch questionStartTimeRef — it is solely
                 // owned by handleNextQuestion and this initial-load path.
                 if (!initialLoadDoneRef.current) {
                     initialLoadDoneRef.current = true;
-                    questionStartTimeRef.current = toUTCMs(fetched.updatedAt);
+                    const dbTimestampMs = toUTCMs(fetched.updatedAt);
+                    const now = Date.now();
+                    const elapsedMs = now - dbTimestampMs;
+
+                    if (elapsedMs >= 0) {
+                        // Normal case: DB timestamp is in the past. Use it so Q1 timer is in sync
+                        // with how long ago the quiz went LIVE.
+                        questionStartTimeRef.current = dbTimestampMs;
+                    } else {
+                        // Abnormal: DB timestamp is in the "future" (server/client clock skew).
+                        // Fall back to Date.now() — gives the full timer for Q1 rather than 200+s.
+                        questionStartTimeRef.current = now;
+                    }
                 }
 
                 return fetched;
