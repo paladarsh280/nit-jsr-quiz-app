@@ -33,22 +33,36 @@ export default function LiveGuidedRoom() {
     const [leaderboardAnimStage, setLeaderboardAnimStage] = useState(0); // 0=none, 1=3rd, 2=2nd, 3=1st, 4=full
     const [statusLoading, setStatusLoading] = useState(false);
 
-    // 🔥 Refs for preventing double-advance and protecting optimistic updates from polling
+    // Refs for preventing double-advance and protecting optimistic updates from polling
     const isAdvancingRef = useRef(false);        // True during advance — blocks handleTimeUp + extra clicks
     const minExpectedIndexRef = useRef(0);        // Polling never reverts below this index
+    // 🔥 KEY FIX: Track question start time locally (not from DB) so polling can never corrupt it.
+    // quiz.updatedAt comes via DB → polling (every 2s) and can race with the optimistic update,
+    // causing the timer to show 200+ seconds. Using Date.now() snapshots eliminates clock-skew
+    // and race conditions entirely.
+    const questionStartTimeRef = useRef<number>(0);
+    const initialLoadDoneRef = useRef(false);
 
     const fetchQuiz = useCallback(async () => {
         const res = await getQuizStats(quizId);
         if (res.success) {
             setQuiz((prev: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
                 const fetched = res.quiz as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-                // 🔥 FIX: Never let polling revert activeQuestionIndex backward.
-                // This protects our optimistic update when the DB hasn't committed yet.
+                // Never let polling revert activeQuestionIndex backward.
                 if (fetched.activeQuestionIndex < minExpectedIndexRef.current) {
                     return { ...fetched, activeQuestionIndex: minExpectedIndexRef.current };
                 }
                 // Once DB matches or exceeds, update minExpected to stay in sync
                 minExpectedIndexRef.current = fetched.activeQuestionIndex;
+
+                // 🔥 On INITIAL load only: sync questionStartTime from the DB's updatedAt.
+                // On subsequent polls, we NEVER touch questionStartTimeRef — it is solely
+                // owned by handleNextQuestion and this initial-load path.
+                if (!initialLoadDoneRef.current) {
+                    initialLoadDoneRef.current = true;
+                    questionStartTimeRef.current = toUTCMs(fetched.updatedAt);
+                }
+
                 return fetched;
             });
         } else {
@@ -89,10 +103,11 @@ export default function LiveGuidedRoom() {
         }
 
         if (phase === "question") {
+            const startTimeMs = questionStartTimeRef.current;
             const timer = setInterval(() => {
-                // Use toUTCMs so this works whether quiz.updatedAt is a Date (server action)
-                // or a string (after Realtime update via setQuiz merge)
-                const elapsedSec = Math.floor((Date.now() - toUTCMs(quiz.updatedAt)) / 1000);
+                // Use local questionStartTimeRef — never quiz.updatedAt from DB.
+                // This avoids the polling-race that caused 200+ second timers.
+                const elapsedSec = Math.floor((Date.now() - startTimeMs) / 1000);
                 const calculatedTimeLeft = Math.max(0, currentQ.timeLimit - elapsedSec);
 
                 setTimeLeft(calculatedTimeLeft);
@@ -104,7 +119,8 @@ export default function LiveGuidedRoom() {
             }, 500);
             return () => clearInterval(timer);
         }
-    }, [quiz?.activeQuestionIndex, phase, quiz?.updatedAt]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [quiz?.activeQuestionIndex, phase]);
 
     // Save professor phase to local storage so refreshes don't reset the view
     useEffect(() => {
@@ -165,8 +181,11 @@ export default function LiveGuidedRoom() {
         // Set the minimum expected index so polling can't revert below this
         minExpectedIndexRef.current = nextIndex;
 
-        // Optimistic update: update quiz state immediately with correct index + timestamp
-        // so the timer useEffect gets fresh data and doesn't fire timeLeft=0 instantly
+        // 🔥 Set question start time to NOW (local clock) before the optimistic state update.
+        // This is the single source of truth for the professor timer — no DB timestamp involved.
+        questionStartTimeRef.current = Date.now();
+
+        // Optimistic update: update quiz state immediately with correct index
         const nowIso = new Date().toISOString();
         setQuiz((prev: any) => ({ ...prev, activeQuestionIndex: nextIndex, updatedAt: nowIso })); // eslint-disable-line @typescript-eslint/no-explicit-any
         setPhase("question");
@@ -179,10 +198,10 @@ export default function LiveGuidedRoom() {
             localStorage.removeItem(`prof_state_${quiz.id}`);
             toast.success(`Q${nextIndex + 1} is live!`);
             // Don't call fetchQuiz here — let the 2s polling sync naturally.
-            // Calling it manually could race with the optimistic update.
         } else {
             toast.error("Failed to advance question.");
-            // Rollback
+            // Rollback questionStartTime too
+            questionStartTimeRef.current = 0;
             minExpectedIndexRef.current = nextIndex - 1;
             setQuiz((prev: any) => ({ ...prev, activeQuestionIndex: nextIndex - 1 })); // eslint-disable-line @typescript-eslint/no-explicit-any
             setPhase("leaderboard");
