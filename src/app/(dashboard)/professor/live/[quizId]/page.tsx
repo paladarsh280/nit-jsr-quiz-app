@@ -82,7 +82,9 @@ export default function LiveGuidedRoom() {
 
         if (phase === "question") {
             const timer = setInterval(() => {
-                const elapsedSec = Math.floor((Date.now() - new Date(quiz.updatedAt).getTime()) / 1000);
+                const rawUpdatedAt = quiz.updatedAt as string;
+                const updatedAtUTC = rawUpdatedAt.endsWith('Z') ? rawUpdatedAt : rawUpdatedAt + 'Z';
+                const elapsedSec = Math.floor((Date.now() - new Date(updatedAtUTC).getTime()) / 1000);
                 const calculatedTimeLeft = Math.max(0, currentQ.timeLimit - elapsedSec);
 
                 setTimeLeft(calculatedTimeLeft);
@@ -411,8 +413,23 @@ export default function LiveGuidedRoom() {
                                 )}
                             </Button>
                         ) : (
-                            <Button size="lg" disabled={phase === "question" || phase === "stats" || (phase === "leaderboard" && leaderboardAnimStage < 4)} onClick={handleEndQuiz} className="text-xl px-10 py-8 rounded-2xl bg-red-600 hover:bg-red-700 gap-3 shadow-lg">
-                                <StopCircle className="h-6 w-6" /> Finish Quiz
+                            // 🔥 FIX: "Finish Quiz" button should ALWAYS be clickable on the last
+                            // question — don't lock it behind the leaderboard animation.
+                            // A professor may be in a hurry or stuck mid-animation and needs to end the quiz.
+                            <Button
+                                size="lg"
+                                disabled={phase === "question" || phase === "stats" || statusLoading}
+                                onClick={handleEndQuiz}
+                                className={`text-xl px-10 py-8 rounded-2xl gap-3 shadow-lg transition-all ${
+                                    phase === "question" || phase === "stats"
+                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                        : 'bg-red-600 hover:bg-red-700 text-white'
+                                }`}
+                            >
+                                {statusLoading
+                                    ? <><span className="animate-spin mr-2">⏳</span> Ending...</>
+                                    : <><StopCircle className="h-6 w-6" /> Finish Quiz</>
+                                }
                             </Button>
                         )}
                     </div>

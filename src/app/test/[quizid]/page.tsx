@@ -54,7 +54,10 @@ export default function ExamRoom() {
                     setCurrentIndex((res.quiz as any).activeQuestionIndex);
                     
                     // 🔥 Sync timer using the server's updatedAt timestamp
-                    const elapsedSec = Math.floor((Date.now() - new Date(res.quiz.updatedAt).getTime()) / 1000);
+                    // Normalize to UTC so the timer calculation is timezone-safe
+                    const rawUpdatedAt = res.quiz.updatedAt as unknown as string;
+                    const updatedAtUTC = rawUpdatedAt.endsWith('Z') ? rawUpdatedAt : rawUpdatedAt + 'Z';
+                    const elapsedSec = Math.floor((Date.now() - new Date(updatedAtUTC).getTime()) / 1000);
                     const calculatedTimeLeft = Math.max(0, (res.quiz.questions[(res.quiz as any).activeQuestionIndex]?.timeLimit || 30) - elapsedSec);
                     setTimeLeft(calculatedTimeLeft);
                     
@@ -139,13 +142,21 @@ export default function ExamRoom() {
                         setLeaderboardAnimStage(0);
                         setQuestionStartTime(Date.now());
                         
-                        const elapsedSec = Math.floor((Date.now() - new Date(newQuiz.updatedAt).getTime()) / 1000);
+                        // 🔥 FIX: Supabase Realtime payloads return timestamps without 'Z' suffix,
+                        // causing the browser to parse them as local time instead of UTC.
+                        // Appending 'Z' forces correct UTC interpretation.
+                        const rawUpdatedAt = newQuiz.updatedAt as string;
+                        const updatedAtUTC = rawUpdatedAt.endsWith('Z') ? rawUpdatedAt : rawUpdatedAt + 'Z';
+                        const elapsedSec = Math.floor((Date.now() - new Date(updatedAtUTC).getTime()) / 1000);
                         const newTimeLimit = latestQuiz?.questions[newQuiz.activeQuestionIndex]?.timeLimit || 30;
                         const calculatedTimeLeft = Math.max(1, newTimeLimit - elapsedSec);
                         setTimeLeft(calculatedTimeLeft);
                     } else if (!latestWaiting) {
                         // Tight sync for late joiners
-                        const elapsedSec = Math.floor((Date.now() - new Date(newQuiz.updatedAt).getTime()) / 1000);
+                        // 🔥 FIX: Normalize updatedAt to UTC before parsing
+                        const rawUpdatedAt2 = newQuiz.updatedAt as string;
+                        const updatedAtUTC2 = rawUpdatedAt2.endsWith('Z') ? rawUpdatedAt2 : rawUpdatedAt2 + 'Z';
+                        const elapsedSec = Math.floor((Date.now() - new Date(updatedAtUTC2).getTime()) / 1000);
                         const newTimeLimit = latestQuiz?.questions[newQuiz.activeQuestionIndex]?.timeLimit || 30;
                         const calculatedTimeLeft = Math.max(0, newTimeLimit - elapsedSec);
                         if (Math.abs(latestTimeLeft - calculatedTimeLeft) > 2) {
@@ -178,14 +189,27 @@ export default function ExamRoom() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [quizId, examFinished, isLiveGuided]);
 
-    // 🔥 POLLING FALLBACK: When student is waiting for professor's next question,
-    // poll every 3 seconds in case Realtime event was missed
+    // 🔥 POLLING FALLBACK: Poll every 3 seconds once the student has started the quiz.
+    // This catches:
+    //  1. Professor ending the quiz while the student timer is still running (Realtime miss)
+    //  2. Professor advancing to next question while student is in "waiting" state
+    // We always poll when live — not just when waitingForProfessor.
     useEffect(() => {
-        if (!isLiveGuided || !hasStarted || !waitingForProfessor || examFinished) return;
+        if (!isLiveGuided || !hasStarted || examFinished) return;
 
         const poll = async () => {
             const res = await getQuizForStudent(quizId);
-            if (!res.success || !res.quiz) return;
+            if (!res.success || !res.quiz) {
+                // 🔥 FIX: If the quiz is no longer found (e.g., status is COMPLETED),
+                // getQuizForStudent returns an error. Treat this as quiz ended.
+                if (res.error === "Quiz not available or ended.") {
+                    toast.info("The Professor has ended the quiz.");
+                    setExamFinished(true);
+                    localStorage.removeItem(`exam_state_${quizId}`);
+                    setTimeout(() => router.push("/student"), 2000);
+                }
+                return;
+            }
             const fetchedQuiz = res.quiz as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
             if (fetchedQuiz.status === "COMPLETED") {
@@ -199,7 +223,10 @@ export default function ExamRoom() {
             if (fetchedQuiz.activeQuestionIndex > currentIndexRef.current) {
                 // Professor advanced — sync up!
                 const newIndex = fetchedQuiz.activeQuestionIndex;
-                const elapsedSec = Math.floor((Date.now() - new Date(fetchedQuiz.updatedAt).getTime()) / 1000);
+                // 🔥 FIX: Normalize to UTC before parsing to get correct elapsed time
+                const rawUpdatedAt = fetchedQuiz.updatedAt as string;
+                const updatedAtUTC = rawUpdatedAt.endsWith('Z') ? rawUpdatedAt : rawUpdatedAt + 'Z';
+                const elapsedSec = Math.floor((Date.now() - new Date(updatedAtUTC).getTime()) / 1000);
                 const newTimeLimit = fetchedQuiz.questions[newIndex]?.timeLimit || 30;
                 const calculatedTimeLeft = Math.max(1, newTimeLimit - elapsedSec);
 
@@ -219,7 +246,7 @@ export default function ExamRoom() {
         const interval = setInterval(poll, 3000);
         return () => clearInterval(interval);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [quizId, isLiveGuided, hasStarted, waitingForProfessor, examFinished]);
+    }, [quizId, isLiveGuided, hasStarted, examFinished]);
 
     // Save state to LocalStorage continuously
     useEffect(() => {
