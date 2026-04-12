@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Timer, CheckCircle2, Maximize, Cloud, Hourglass, Trophy, Medal } from "lucide-react";
+import { Loader2, Timer, CheckCircle2, Maximize, Cloud, Hourglass, Trophy, Medal, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PremiumLoader } from "@/components/ui/PremiumLoader";
@@ -46,6 +46,9 @@ export default function ExamRoom() {
     const [questionStartTime, setQuestionStartTime] = useState<number>(() => Date.now());
     const [liveLeaderboard, setLiveLeaderboard] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
     const [leaderboardAnimStage, setLeaderboardAnimStage] = useState(0);
+
+    // WAITING ROOM specific states
+    const [waitingUsers, setWaitingUsers] = useState<number>(0);
 
     // Stable ref for handleSubmitExam to avoid useEffect dependency issues
     const handleSubmitExamRef = useRef<((isAutoSubmit?: boolean) => Promise<void>) | undefined>(undefined);
@@ -260,47 +263,111 @@ export default function ExamRoom() {
         }
     }, [currentIndex, answers, timeLeft, loading, quiz, examFinished, quizId, hasStarted]);
 
-    // Timer Logic
+    // WAITING ROOM presence tracking & Polling for LIVE status
+    useEffect(() => {
+        if (!quiz || quiz.status !== "DRAFT") return;
+
+        // Presence tracking
+        const room = supabase.channel(`waiting_room_${quizId}`, {
+            config: {
+                presence: {
+                    key: "student_" + Math.random().toString(36).substring(7),
+                },
+            },
+        });
+
+        room
+            .on("presence", { event: "sync" }, () => {
+                const presenceState = room.presenceState();
+                setWaitingUsers(Object.keys(presenceState).length);
+            })
+            .subscribe(async (status) => {
+                if (status === "SUBSCRIBED") {
+                    await room.track({ joinedAt: Date.now() });
+                }
+            });
+
+        // Polling to check when professor starts the quiz
+        const pollStatus = async () => {
+            const res = await getQuizForStudent(quizId);
+            if (res.success && res.quiz && res.quiz.status !== "DRAFT") {
+                setQuiz(res.quiz);
+                toast.success("The quiz has started!");
+            }
+        };
+
+        const interval = setInterval(pollStatus, 3000);
+
+        return () => {
+            supabase.removeChannel(room);
+            clearInterval(interval);
+        };
+    }, [quiz?.status, quizId]);
+
+    // Timer Logic — uses real elapsed time so tab-backgrounding doesn't freeze the countdown
     useEffect(() => {
         if (loading || examFinished || !quiz || !hasStarted) return;
 
-        if (timeLeft <= 0) {
-            if (isLiveGuided) {
-                // In live guided, when time's up, mark as waiting
-                if (!waitingForProfessor) {
-                    setWaitingForProfessor(true);
-                    // Fetch leaderboard when time is up
-                    getLiveLeaderboardForStudent(quizId).then(res => {
-                        if (res.success) {
-                            setLiveLeaderboard(res);
-                            // Start staggered animation
-                            setLeaderboardAnimStage(0);
-                            setTimeout(() => setLeaderboardAnimStage(1), 400);   // 3rd place
-                            setTimeout(() => setLeaderboardAnimStage(2), 900);   // 2nd place
-                            setTimeout(() => setLeaderboardAnimStage(3), 1400);  // 1st place
-                            setTimeout(() => setLeaderboardAnimStage(4), 2200);  // Full list
-                        }
-                    });
+        const currentQ = quiz.questions[currentIndex];
+        if (!currentQ) return;
+        const totalTime = currentQ.timeLimit || 60;
+
+        // Calculate timeLeft from real clock, not by decrementing
+        const calcTimeLeft = () => {
+            const elapsedSec = Math.floor((Date.now() - questionStartTime) / 1000);
+            return Math.max(0, totalTime - elapsedSec);
+        };
+
+        const handleTick = () => {
+            const remaining = calcTimeLeft();
+            setTimeLeft(remaining);
+
+            if (remaining <= 0) {
+                if (isLiveGuided) {
+                    if (!waitingForProfessorRef.current) {
+                        setWaitingForProfessor(true);
+                        getLiveLeaderboardForStudent(quizId).then(res => {
+                            if (res.success) {
+                                setLiveLeaderboard(res);
+                                setLeaderboardAnimStage(0);
+                                setTimeout(() => setLeaderboardAnimStage(1), 400);
+                                setTimeout(() => setLeaderboardAnimStage(2), 900);
+                                setTimeout(() => setLeaderboardAnimStage(3), 1400);
+                                setTimeout(() => setLeaderboardAnimStage(4), 2200);
+                            }
+                        });
+                    }
+                } else {
+                    if (currentIndex < quiz.questions.length - 1) {
+                        setCurrentIndex(currentIndex + 1);
+                        setQuestionStartTime(Date.now());
+                        setTimeLeft(quiz.questions[currentIndex + 1]?.timeLimit || 60);
+                    } else {
+                        setExamFinished(true);
+                        handleSubmitExamRef.current?.(true);
+                    }
                 }
-                return;
             }
+        };
 
-            if (currentIndex < quiz.questions.length - 1) {
-                setCurrentIndex(currentIndex + 1);
-                setTimeLeft(quiz.questions[currentIndex + 1]?.timeLimit || 60);
-            } else {
-                setExamFinished(true);
-                handleSubmitExamRef.current?.(true);
+        // Run immediately on mount/re-render to catch up
+        handleTick();
+
+        const timer = setInterval(handleTick, 1000);
+
+        // 🔥 FIX: When tab becomes visible again, immediately re-sync timer
+        const handleVisibility = () => {
+            if (document.visibilityState === "visible") {
+                handleTick();
             }
-            return;
-        }
+        };
+        document.addEventListener("visibilitychange", handleVisibility);
 
-        const timer = setInterval(() => {
-            setTimeLeft((prev) => prev - 1);
-        }, 1000);
-
-        return () => clearInterval(timer);
-    }, [loading, examFinished, timeLeft, currentIndex, quiz, hasStarted, isLiveGuided, liveAnswerSubmitted]);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", handleVisibility);
+        };
+    }, [loading, examFinished, currentIndex, quiz, hasStarted, isLiveGuided, questionStartTime]);
 
     const handleNextQuestion = () => {
         if (!quiz) return;
@@ -369,6 +436,37 @@ export default function ExamRoom() {
     handleSubmitExamRef.current = handleSubmitExam;
 
     if (loading) return <PremiumLoader text="Preparing your Exam Room..." />;
+    
+    // Check if the quiz is in DRAFT state
+    if (quiz && quiz.status === "DRAFT") {
+        return (
+            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 text-center shadow-inner">
+                <div className="bg-white p-10 rounded-3xl shadow-xl border max-w-lg w-full flex flex-col items-center">
+                    <div className="h-24 w-24 bg-blue-100 rounded-full flex items-center justify-center mb-6 shadow-inner animate-pulse">
+                        <Users className="h-10 w-10 text-blue-600" />
+                    </div>
+                    <h1 className="text-4xl font-black text-gray-900 mb-3 tracking-tight">Waiting Room</h1>
+                    <p className="text-gray-500 mb-8 text-lg font-medium">
+                        You're in! Waiting for your professor to start the quiz...
+                    </p>
+                    
+                    <div className="bg-blue-50/50 px-8 py-6 rounded-2xl border border-blue-100 flex flex-col items-center w-full">
+                        <span className="text-sm font-bold text-blue-400 uppercase tracking-widest mb-2">
+                            People in Lobby
+                        </span>
+                        <div className="text-6xl font-black text-blue-600 flex items-center gap-4 drop-shadow-sm">
+                            <span className="relative flex h-5 w-5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-5 w-5 bg-blue-500"></span>
+                            </span>
+                            {waitingUsers}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     if (!quiz || !quiz.questions[currentIndex]) return null;
 
     const currentQ = quiz.questions[currentIndex];

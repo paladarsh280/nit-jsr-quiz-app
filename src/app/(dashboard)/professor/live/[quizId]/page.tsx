@@ -116,9 +116,8 @@ export default function LiveGuidedRoom() {
 
         if (phase === "question") {
             const startTimeMs = questionStartTimeRef.current;
-            const timer = setInterval(() => {
-                // Use local questionStartTimeRef — never quiz.updatedAt from DB.
-                // This avoids the polling-race that caused 200+ second timers.
+            
+            const handleTick = () => {
                 const elapsedSec = Math.floor((Date.now() - startTimeMs) / 1000);
                 const calculatedTimeLeft = Math.max(0, currentQ.timeLimit - elapsedSec);
 
@@ -128,8 +127,25 @@ export default function LiveGuidedRoom() {
                     clearInterval(timer);
                     handleTimeUp();
                 }
-            }, 500);
-            return () => clearInterval(timer);
+            };
+
+            // Run immediately to catch up after tab switch
+            handleTick();
+
+            const timer = setInterval(handleTick, 500);
+
+            // 🔥 FIX: When tab becomes visible again, immediately re-sync timer
+            const handleVisibility = () => {
+                if (document.visibilityState === "visible") {
+                    handleTick();
+                }
+            };
+            document.addEventListener("visibilitychange", handleVisibility);
+
+            return () => {
+                clearInterval(timer);
+                document.removeEventListener("visibilitychange", handleVisibility);
+            };
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [quiz?.activeQuestionIndex, phase]);

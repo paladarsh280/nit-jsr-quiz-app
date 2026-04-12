@@ -23,9 +23,6 @@ export async function verifyAndJoinQuiz(code: string) {
         }
 
         // 2. Check karo ki Quiz Live hai ya nahi
-        if (quiz.status === "DRAFT") {
-            return { success: false, error: "The professor hasn't started this quiz yet." };
-        }
         if (quiz.status === "COMPLETED") {
             return { success: false, error: "This quiz has already ended." };
         }
@@ -68,7 +65,10 @@ export async function getQuizForStudent(quizId: string) {
 
         // 🔥 FIX: findUnique ki jagah findFirst use kiya hai
         const quiz = await prisma.quiz.findFirst({
-            where: { id: quizId, status: "LIVE" },
+            where: { 
+                id: quizId, 
+                status: { in: ["LIVE", "DRAFT"] } 
+            },
             include: {
                 questions: {
                     select: {
@@ -323,6 +323,21 @@ export async function submitLiveAnswer(
         });
 
         if (!attempt) {
+            // 🔥 FIX: Verify user actually exists in DB before creating attempt
+            // This catches stale JWT sessions where the user was deleted or DB was reset
+            const userExists = await prisma.user.findUnique({ where: { id: studentId }, select: { id: true } });
+            if (!userExists) {
+                console.error("submitLiveAnswer: User not found in DB for studentId:", studentId);
+                return { success: false, error: "Session expired. Please log out and log back in." };
+            }
+
+            // Also verify the quiz exists
+            const quizExists = await prisma.quiz.findUnique({ where: { id: quizId }, select: { id: true } });
+            if (!quizExists) {
+                return { success: false, error: "Quiz not found." };
+            }
+
+            console.log("Creating new StudentAttempt for student:", studentId, "quiz:", quizId);
             attempt = await prisma.studentAttempt.create({
                 data: { studentId, quizId, score: 0, isFinished: false }
             });
@@ -375,8 +390,8 @@ export async function submitLiveAnswer(
         }
 
         return { success: true, isCorrect, marksAwarded };
-    } catch {
-        // console.error("Live Answer Error:", error);
+    } catch (error) {
+        console.error("Live Answer Error:", error);
         return { success: false, error: "Failed to submit answer." };
     }
 }

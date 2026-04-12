@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PlayCircle, StopCircle, ArrowLeft, Loader2, Download, Users, BookOpen } from "lucide-react";
 import * as XLSX from "xlsx";
 import { QRCodeSVG } from "qrcode.react";
+import { supabase } from "@/lib/supabase";
 
 export default function QuizDetailsPage() {
     const params = useParams();
@@ -21,10 +22,29 @@ export default function QuizDetailsPage() {
     const [quiz, setQuiz] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [statusLoading, setStatusLoading] = useState(false);
+    const [waitingUsers, setWaitingUsers] = useState<number>(0);
 
     useEffect(() => {
         fetchQuiz();
     }, [quizId]);
+
+    // Listen to Waiting Room Presence for DRAFT quizzes
+    useEffect(() => {
+        if (!quiz || quiz.status !== "DRAFT") return;
+
+        const room = supabase.channel(`waiting_room_${quizId}`);
+
+        room
+            .on("presence", { event: "sync" }, () => {
+                const presenceState = room.presenceState();
+                setWaitingUsers(Object.keys(presenceState).length);
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(room);
+        };
+    }, [quiz?.status, quizId]);
 
     const fetchQuiz = async () => {
         const res = await getQuizStats(quizId);
@@ -124,9 +144,21 @@ export default function QuizDetailsPage() {
                     {/* Action Buttons (Live / End Test) */}
                     <div className="flex flex-col gap-3 w-full md:w-auto min-w-[200px]">
                         {quiz.status === "DRAFT" && (
-                            <Button onClick={() => handleStatusChange("LIVE")} disabled={statusLoading} className="bg-green-600 hover:bg-green-700 w-full gap-2 h-11">
-                                {statusLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />} Start Test (Make Live)
-                            </Button>
+                            <div className="flex flex-col gap-2 w-full">
+                                <div className="bg-blue-50/80 border border-blue-100 rounded-lg p-3 flex items-center justify-between shadow-sm animate-in fade-in zoom-in duration-300">
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative flex h-3 w-3">
+                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                          <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                                        </div>
+                                        <span className="text-sm font-semibold text-blue-800">Students Waiting</span>
+                                    </div>
+                                    <span className="text-2xl font-black text-blue-700">{waitingUsers}</span>
+                                </div>
+                                <Button onClick={() => handleStatusChange("LIVE")} disabled={statusLoading} className="bg-green-600 hover:bg-green-700 w-full gap-2 h-11">
+                                    {statusLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />} Start Test (Make Live)
+                                </Button>
+                            </div>
                         )}
                         {quiz.status === "LIVE" && quiz.quizMode === "LIVE_GUIDED" && (
                             <Button onClick={() => router.push(`/professor/live/${quiz.id}`)} className="bg-blue-600 hover:bg-blue-700 w-full gap-2 h-11">

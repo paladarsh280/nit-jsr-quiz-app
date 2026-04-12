@@ -18,7 +18,7 @@ export function Footer() {
                 </Link>
 
                 {/* Middle: Credits */}
-                <div className="flex items-center gap-1.5 text-sm font-medium text-gray-500">
+                {/* <div className="flex items-center gap-1.5 text-sm font-medium text-gray-500">
                     Created with <Heart className="h-3.5 w-3.5 text-red-500 fill-red-500 animate-pulse" /> by
                     <a
                         href="https://nitjsr.ac.in/clubs/webteam"
@@ -28,7 +28,7 @@ export function Footer() {
                     >
                         Official Web-Team
                     </a>
-                </div>
+                </div> */}
 
                 {/* Right Side: GitHub Icon */}
                 <a
