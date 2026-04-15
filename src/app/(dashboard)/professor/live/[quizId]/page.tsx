@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, PlayCircle, Users, CheckCircle2, ChevronRight, Timer, BarChart3, SkipForward, StopCircle, Trophy, Medal } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { supabase } from "@/lib/supabase";
 
 // Safe UTC timestamp helper: handles both Date objects (from Prisma/server actions)
 // and raw strings from Supabase Realtime payloads (which often lack the 'Z' suffix).
@@ -42,6 +43,15 @@ export default function LiveGuidedRoom() {
     // and race conditions entirely.
     const questionStartTimeRef = useRef<number>(0);
     const initialLoadDoneRef = useRef(false);
+    const channelRef = useRef<any>(null);
+
+    useEffect(() => {
+        if (!quizId) return;
+        const channel = supabase.channel(`quiz_changes_${quizId}`);
+        channel.subscribe();
+        channelRef.current = channel;
+        return () => { supabase.removeChannel(channel); };
+    }, [quizId]);
 
     const fetchQuiz = useCallback(async () => {
         const res = await getQuizStats(quizId);
@@ -216,6 +226,16 @@ export default function LiveGuidedRoom() {
 
         // Optimistic update: update quiz state immediately with correct index
         const nowIso = new Date().toISOString();
+        
+        // Broadcast the event INSTANTLY via WebSockets to bypass Postgres delays
+        if (channelRef.current) {
+            channelRef.current.send({
+                type: 'broadcast',
+                event: 'next_question',
+                payload: { activeQuestionIndex: nextIndex, updatedAt: nowIso }
+            });
+        }
+
         setQuiz((prev: any) => ({ ...prev, activeQuestionIndex: nextIndex, updatedAt: nowIso })); // eslint-disable-line @typescript-eslint/no-explicit-any
         setPhase("question");
         setQuestionStats(null);
@@ -452,8 +472,8 @@ export default function LiveGuidedRoom() {
                             <Button
                                 size="lg"
                                 onClick={handleNextQuestion}
-                                disabled={phase === "question" || isAdvancing || phase === "stats" || (phase === "leaderboard" && leaderboardAnimStage < 4)}
-                                className={`text-xl px-10 py-8 rounded-2xl gap-3 shadow-lg transition-all ${phase === "question" || phase === "stats" || (phase === "leaderboard" && leaderboardAnimStage < 4)
+                                disabled={phase === "question" || isAdvancing || phase === "stats"}
+                                className={`text-xl px-10 py-8 rounded-2xl gap-3 shadow-lg transition-all ${phase === "question" || phase === "stats"
                                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                         : isAdvancing
                                             ? 'bg-blue-400 text-white cursor-wait'
@@ -462,8 +482,6 @@ export default function LiveGuidedRoom() {
                             >
                                 {phase === "stats" ? (
                                     <>{"Calculating..."} <BarChart3 className="h-6 w-6 animate-pulse" /></>
-                                ) : phase === "leaderboard" && leaderboardAnimStage < 4 ? (
-                                    <>{"Leaderboard..."} <Trophy className="h-6 w-6 animate-pulse" /></>
                                 ) : (
                                     <>Next Question <ChevronRight className="h-6 w-6" /></>
                                 )}

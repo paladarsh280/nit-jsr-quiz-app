@@ -121,6 +121,34 @@ export default function ExamRoom() {
         const channel = supabase
             .channel(`quiz_changes_${quizId}`)
             .on(
+                'broadcast',
+                { event: 'next_question' },
+                (payload) => {
+                    const newIndex = payload.payload.activeQuestionIndex;
+                    const updatedAt = payload.payload.updatedAt;
+                    const latestIndex = currentIndexRef.current;
+                    const latestQuiz = quizRef.current;
+
+                    if (newIndex > latestIndex) {
+                        setCurrentIndex(newIndex);
+                        setLiveAnswerSubmitted(false);
+                        setLiveAnswerResult(null);
+                        setWaitingForProfessor(false);
+                        setLiveLeaderboard(null);
+                        setLeaderboardAnimStage(0);
+                        setQuestionStartTime(Date.now());
+
+                        const elapsedSec = Math.floor((Date.now() - toUTCMs(updatedAt)) / 1000);
+                        const newTimeLimit = latestQuiz?.questions[newIndex]?.timeLimit || 30;
+                        const calculatedTimeLeft = Math.max(1, newTimeLimit - elapsedSec);
+                        setTimeLeft(calculatedTimeLeft);
+                        
+                        setQuiz((prev: any) => ({ ...prev, activeQuestionIndex: newIndex, updatedAt }));
+                        toast.success(`Question ${newIndex + 1} is live!`, { id: `q-live-${newIndex}` });
+                    }
+                }
+            )
+            .on(
                 'postgres_changes',
                 {
                     event: 'UPDATE',
