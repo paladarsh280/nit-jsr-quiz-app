@@ -82,10 +82,13 @@ export function Navbar() {
 
                     {/* Logo */}
                     <Link href="/" className="flex items-center gap-2">
-                        <GraduationCap className="h-8 w-8 text-blue-600 hidden md:block" />
+                        {/* <GraduationCap className="h-8 w-8 text-blue-600 hidden md:block" />
                         <span className="text-xl font-bold tracking-tight text-gray-900">
                             NITJSR Quiz
-                        </span>
+                        </span> */}
+                        <img src="/mvi-lab-logo.jpeg" alt="mvi-lab-logo" className="h-15 w-auto object-contain" />
+
+
                     </Link>
                 </div>
 
