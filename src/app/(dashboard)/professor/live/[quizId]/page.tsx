@@ -116,6 +116,7 @@ export default function LiveGuidedRoom() {
 
         if (phase === "question") {
             const startTimeMs = questionStartTimeRef.current;
+            let timer: NodeJS.Timeout | undefined;
             
             const handleTick = () => {
                 const elapsedSec = Math.floor((Date.now() - startTimeMs) / 1000);
@@ -124,7 +125,7 @@ export default function LiveGuidedRoom() {
                 setTimeLeft(calculatedTimeLeft);
 
                 if (calculatedTimeLeft === 0) {
-                    clearInterval(timer);
+                    if (timer) clearInterval(timer);
                     handleTimeUp();
                 }
             };
@@ -132,7 +133,7 @@ export default function LiveGuidedRoom() {
             // Run immediately to catch up after tab switch
             handleTick();
 
-            const timer = setInterval(handleTick, 500);
+            timer = setInterval(handleTick, 500);
 
             // 🔥 FIX: When tab becomes visible again, immediately re-sync timer
             const handleVisibility = () => {
@@ -143,7 +144,7 @@ export default function LiveGuidedRoom() {
             document.addEventListener("visibilitychange", handleVisibility);
 
             return () => {
-                clearInterval(timer);
+                if (timer) clearInterval(timer);
                 document.removeEventListener("visibilitychange", handleVisibility);
             };
         }
