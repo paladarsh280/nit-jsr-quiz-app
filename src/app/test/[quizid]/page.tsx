@@ -162,7 +162,7 @@ export default function ExamRoom() {
 
 
                     if (newQuiz.status === "COMPLETED") {
-                        toast.info("The Professor has ended the quiz.");
+                        toast.info("The Professor has ended the quiz.", { id: "quiz-ended" });
                         setExamFinished(true);
                         localStorage.removeItem(`exam_state_${quizId}`);
                         setTimeout(() => router.push("/student"), 2000);
@@ -194,7 +194,7 @@ export default function ExamRoom() {
             if (!res.success || !res.quiz) {
 
                 if (res.error === "Quiz not available or ended.") {
-                    toast.info("The Professor has ended the quiz.");
+                    toast.info("The Professor has ended the quiz.", { id: "quiz-ended" });
                     setExamFinished(true);
                     localStorage.removeItem(`exam_state_${quizId}`);
                     setTimeout(() => router.push("/student"), 2000);
@@ -205,7 +205,7 @@ export default function ExamRoom() {
             const fetchedQuiz = res.quiz as any;
 
             if (fetchedQuiz.status === "COMPLETED") {
-                toast.info("The Professor has ended the quiz.");
+                toast.info("The Professor has ended the quiz.", { id: "quiz-ended" });
                 setExamFinished(true);
                 localStorage.removeItem(`exam_state_${quizId}`);
                 setTimeout(() => router.push("/student"), 2000);
@@ -227,7 +227,7 @@ export default function ExamRoom() {
                 setLeaderboardAnimStage(0);
                 setQuestionStartTime(Date.now());
                 setTimeLeft(calculatedTimeLeft);
-                toast.success(`Question ${newIndex + 1} is live!`);
+                toast.success(`Question ${newIndex + 1} is live!`, { id: `q-live-${newIndex}` });
             }
         };
 
@@ -281,7 +281,7 @@ export default function ExamRoom() {
             const res = await getQuizForStudent(quizId);
             if (res.success && res.quiz && res.quiz.status !== "DRAFT") {
                 setQuiz(res.quiz);
-                toast.success("The quiz has started!");
+                toast.success("The quiz has started!", { id: "quiz-started" });
             }
         };
 
@@ -395,9 +395,9 @@ export default function ExamRoom() {
         const res = await submitLiveAnswer(quizId, questionId, answerValue, type, timeTaken);
         if (res.success) {
             setLiveAnswerResult(res);
-            toast.success("Answer locked successfully!");
+            toast.success("Answer locked successfully!", { id: `answer-locked-${questionId}` });
         } else {
-            toast.error(res.error || "Failed to submit answer");
+            toast.error(res.error || "Failed to submit answer", { id: `answer-err-${questionId}` });
             setLiveAnswerSubmitted(false);
         }
     };
@@ -411,10 +411,10 @@ export default function ExamRoom() {
         const res = await submitExam(quizId, answersString);
         if (res.success) {
             localStorage.removeItem(`exam_state_${quizId}`);
-            toast.success(isAutoSubmit ? `Auto-Submitted! Score: ${res.score}` : `Exam Submitted Successfully! Score: ${res.score}`);
+            toast.success(isAutoSubmit ? `Auto-Submitted! Score: ${res.score}` : `Exam Submitted Successfully! Score: ${res.score}`, { id: "exam-submitted" });
             setTimeout(() => router.push("/student/history"), 2000);
         } else {
-            toast.error(res.error);
+            toast.error(res.error, { id: "exam-submit-err" });
             setIsSubmitting(false);
             setExamFinished(false);
         }
