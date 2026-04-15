@@ -15,8 +15,8 @@ import { QRCodeSVG } from "qrcode.react";
 // and raw strings from Supabase Realtime payloads (which often lack the 'Z' suffix).
 function toUTCMs(val: Date | string | unknown): number {
     if (val instanceof Date) return val.getTime();
-    const s = String(val);
-    return new Date(/Z|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z').getTime();
+    const strVal = String(val);
+    return new Date(/Z|[+-]\d{2}:?\d{2}$/.test(strVal) ? strVal : strVal + 'Z').getTime();
 }
 
 export default function LiveGuidedRoom() {
