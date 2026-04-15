@@ -472,19 +472,15 @@ export default function LiveGuidedRoom() {
                             <Button
                                 size="lg"
                                 onClick={handleNextQuestion}
-                                disabled={phase === "question" || isAdvancing || phase === "stats"}
-                                className={`text-xl px-10 py-8 rounded-2xl gap-3 shadow-lg transition-all ${phase === "question" || phase === "stats"
+                                disabled={phase === "question" || isAdvancing}
+                                className={`text-xl px-10 py-8 rounded-2xl gap-3 shadow-lg transition-all ${phase === "question"
                                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                         : isAdvancing
                                             ? 'bg-blue-400 text-white cursor-wait'
                                             : 'bg-green-600 hover:bg-green-700 text-white'
                                     }`}
                             >
-                                {phase === "stats" ? (
-                                    <>{"Calculating..."} <BarChart3 className="h-6 w-6 animate-pulse" /></>
-                                ) : (
-                                    <>Next Question <ChevronRight className="h-6 w-6" /></>
-                                )}
+                                <>Next Question <ChevronRight className="h-6 w-6" /></>
                             </Button>
                         ) : (
                             // 🔥 FIX: "Finish Quiz" button should ALWAYS be clickable on the last
@@ -492,10 +488,10 @@ export default function LiveGuidedRoom() {
                             // A professor may be in a hurry or stuck mid-animation and needs to end the quiz.
                             <Button
                                 size="lg"
-                                disabled={phase === "question" || phase === "stats" || statusLoading}
+                                disabled={phase === "question" || statusLoading}
                                 onClick={handleEndQuiz}
                                 className={`text-xl px-10 py-8 rounded-2xl gap-3 shadow-lg transition-all ${
-                                    phase === "question" || phase === "stats"
+                                    phase === "question"
                                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                         : 'bg-red-600 hover:bg-red-700 text-white'
                                 }`}
