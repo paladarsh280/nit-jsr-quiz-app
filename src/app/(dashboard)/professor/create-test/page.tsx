@@ -25,8 +25,8 @@ interface Question {
     text: string;
     imageUrl?: string;
     type: QuestionType;
-    timeLimit: number; // Value input by professor
-    timeUnit: "SECONDS" | "MINUTES"; // Added unit selector
+    timeLimit: number;
+    timeUnit: "SECONDS" | "MINUTES";
     marks: number;
     negative: number;
     correctAnswer?: string;
@@ -44,7 +44,7 @@ export default function CreateTestPage() {
     const [questions, setQuestions] = useState<Question[]>([]);
     const [isMounted, setIsMounted] = useState(false);
 
-    // Initial Hydration from Setup Draft
+
     useEffect(() => {
         setIsMounted(true);
         const savedDraft = localStorage.getItem("quiz_draft_state");
@@ -57,7 +57,7 @@ export default function CreateTestPage() {
                 if (parsed.endTime) setEndTime(parsed.endTime);
                 if (parsed.quizMode) setQuizMode(parsed.quizMode);
                 if (parsed.questions && Array.isArray(parsed.questions)) setQuestions(parsed.questions);
-                // Optionally notify that draft was loaded
+
                 toast.success("Draft restored automatically!");
             } catch (error) {
                 console.error("Failed to parse draft state:", error);
@@ -65,7 +65,7 @@ export default function CreateTestPage() {
         }
     }, []);
 
-    // Continuous Autosave
+
     useEffect(() => {
         if (isMounted) {
             const draftData = { title, description, startTime, endTime, quizMode, questions };
@@ -100,18 +100,17 @@ export default function CreateTestPage() {
         setQuestions(questions.map((q) => (q.id === id ? { ...q, [field]: value } : q)));
     };
 
-    // 🔥 IMAGE UPLOAD LOGIC (Local Device to Base64)
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, questionId: string) => {
         const file = e.target.files?.[0];
         if (file) {
-            // Check file size (optional, limit to ~2MB to save DB space)
+
             if (file.size > 2 * 1024 * 1024) {
                 toast.error("File size is too large! Please upload under 2MB.");
                 return;
             }
             const reader = new FileReader();
             reader.onloadend = () => {
-                updateQuestion(questionId, "imageUrl", reader.result as string); // Base64 string set kar rahe hain
+                updateQuestion(questionId, "imageUrl", reader.result as string);
             };
             reader.readAsDataURL(file);
         }
@@ -135,7 +134,7 @@ export default function CreateTestPage() {
         }));
     };
 
-    // 🔥 JSON IMPORT LOGIC
+
     const handleJsonImport = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -145,17 +144,17 @@ export default function CreateTestPage() {
             try {
                 const json = JSON.parse(event.target?.result as string);
 
-                // Validate structure
+
                 if (!json.questions || !Array.isArray(json.questions) || json.questions.length === 0) {
                     toast.error("Invalid JSON: 'questions' array is required and must not be empty.");
                     return;
                 }
 
-                // Auto-fill title/description if present
+
                 if (json.title && !title) setTitle(json.title);
                 if (json.description && !description) setDescription(json.description);
 
-                // Parse questions
+
                 const importedQuestions: Question[] = json.questions.map((q: any) => ({
                     id: Math.random().toString(36).substr(2, 9),
                     text: q.text || "",
@@ -177,7 +176,7 @@ export default function CreateTestPage() {
                         ]
                 }));
 
-                // Merge or replace?
+
                 if (questions.length > 0) {
                     const shouldReplace = confirm(
                         `You already have ${questions.length} question(s). Replace them with ${importedQuestions.length} imported questions?\n\nClick OK to Replace, Cancel to Merge (append).`
@@ -198,7 +197,7 @@ export default function CreateTestPage() {
             }
         };
         reader.readAsText(file);
-        // Reset input so same file can be imported again
+
         e.target.value = "";
     };
 
@@ -207,7 +206,7 @@ export default function CreateTestPage() {
         if (questions.length === 0) return toast.error("Please add at least one question!");
         if (new Date(endTime) <= new Date(startTime)) return toast.error("End time must be after start time!");
 
-        // Anti-Mistake: Prevent 0 time limit
+
         for (let i = 0; i < questions.length; i++) {
             if (!questions[i].timeLimit || questions[i].timeLimit <= 0) {
                 return toast.error(`Question ${i + 1} cannot have a time limit of 0!`);
@@ -216,7 +215,7 @@ export default function CreateTestPage() {
 
         setIsSubmitting(true);
 
-        // Convert to strictly seconds for backend purely
+
         const processedQuestions = questions.map((q) => ({
             ...q,
             timeLimit: q.timeUnit === "MINUTES" ? q.timeLimit * 60 : q.timeLimit,
@@ -227,7 +226,7 @@ export default function CreateTestPage() {
         const result = await createQuizAction(quizData);
 
         if (result.success) {
-            localStorage.removeItem("quiz_draft_state"); // Clean draft on success
+            localStorage.removeItem("quiz_draft_state");
             toast.success(`Quiz Created! Join Code: ${result.code}`);
             setTimeout(() => router.push("/professor"), 2000);
         } else {
@@ -243,7 +242,7 @@ export default function CreateTestPage() {
                     <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Create New Test</h1>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                    {/* JSON Import Button */}
+
                     <div className="relative">
                         <input
                             type="file"
@@ -324,11 +323,11 @@ export default function CreateTestPage() {
                                         className="min-h-[100px] text-base"
                                     />
 
-                                    {/* 🔥 NEW IMAGE UPLOAD SECTION */}
+
                                     <div>
                                         {!q.imageUrl ? (
                                             <div>
-                                                {/* Hidden file input, clicked via label */}
+
                                                 <input
                                                     type="file"
                                                     accept="image/*"
@@ -345,7 +344,7 @@ export default function CreateTestPage() {
                                             </div>
                                         ) : (
                                             <div className="relative inline-block mt-2 border rounded-md p-1 bg-gray-50">
-                                                {/* Image Preview */}
+
                                                 <img src={q.imageUrl} alt="Question Diagram" className="h-32 object-contain rounded-sm" />
                                                 <Button
                                                     variant="destructive"
@@ -402,7 +401,6 @@ export default function CreateTestPage() {
                                 </div>
                             </div>
 
-                            {/* Dynamic Options... */}
                             {(q.type === "SINGLE_CORRECT" || q.type === "MULTI_CORRECT") && (
                                 <div className="space-y-3 mt-4 bg-gray-50 p-4 rounded-lg border">
                                     <Label className="text-sm font-medium text-gray-700">Options (Tick correct ones)</Label>

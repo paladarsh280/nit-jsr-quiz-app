@@ -1,4 +1,4 @@
-// src/actions/student.ts
+
 "use server";
 
 import prisma from "@/lib/db";
@@ -13,7 +13,6 @@ export async function verifyAndJoinQuiz(code: string) {
             return { success: false, error: "Only registered students can join quizzes." };
         }
 
-        // 1. Database me Code dhoondo (Case insensitive)
         const quiz = await prisma.quiz.findUnique({
             where: { code: code.toUpperCase() },
         });
@@ -22,12 +21,11 @@ export async function verifyAndJoinQuiz(code: string) {
             return { success: false, error: "Invalid Join Code. Please check again." };
         }
 
-        // 2. Check karo ki Quiz Live hai ya nahi
+
         if (quiz.status === "COMPLETED") {
             return { success: false, error: "This quiz has already ended." };
         }
 
-        // 3. Check karo ki Student ne pehle toh attempt nahi kiya
         const existingAttempt = await prisma.studentAttempt.findUnique({
             where: {
                 studentId_quizId: {
@@ -41,11 +39,11 @@ export async function verifyAndJoinQuiz(code: string) {
             if (existingAttempt.isFinished) {
                 return { success: false, error: "You have already completed this quiz." };
             }
-            // Agar net chala gaya tha aur wapas aaya hai, toh resume karne do
+
             return { success: true, quizId: quiz.id, message: "Resuming your quiz..." };
         }
 
-        // Sab badhiya hai, join karne do
+
         return { success: true, quizId: quiz.id };
 
     } catch (error) {
@@ -56,18 +54,18 @@ export async function verifyAndJoinQuiz(code: string) {
 
 
 
-// src/actions/student.ts me niche add karo:
+
 
 export async function getQuizForStudent(quizId: string) {
     try {
         const session = await getServerSession(authOptions);
         if (!session || session.user.role !== "STUDENT") return { success: false, error: "Unauthorized" };
 
-        // 🔥 FIX: findUnique ki jagah findFirst use kiya hai
+
         const quiz = await prisma.quiz.findFirst({
-            where: { 
-                id: quizId, 
-                status: { in: ["LIVE", "DRAFT"] } 
+            where: {
+                id: quizId,
+                status: { in: ["LIVE", "DRAFT"] }
             },
             include: {
                 questions: {
@@ -75,7 +73,7 @@ export async function getQuizForStudent(quizId: string) {
                         id: true, text: true, imageUrl: true, type: true, timeLimit: true, marks: true, negative: true,
                         options: { select: { id: true, text: true } }
                     },
-                    orderBy: { createdAt: 'asc' } // 🔥 FIX: questions order consistent rakho warna activeQuestionIndex galat question point karta
+                    orderBy: { createdAt: 'asc' }
                 }
             }
         });
@@ -83,13 +81,13 @@ export async function getQuizForStudent(quizId: string) {
         if (!quiz) return { success: false, error: "Quiz not available or ended." };
         return { success: true, quiz };
     } catch (error) {
-        // Agar fir bhi error aaya toh terminal me print hoga
+
         console.error("Fetch Quiz Error:", error);
         return { success: false, error: "Failed to load quiz." };
     }
 }
 
-// 🔥 THE BRAHMASTRA FIX: Accept simple Strings only
+
 export async function submitExam(quizId: string, answersJson: string) {
     try {
         console.log("Backend Received QuizId:", quizId);
@@ -97,7 +95,8 @@ export async function submitExam(quizId: string, answersJson: string) {
         if (!quizId || quizId === "undefined") return { success: false, error: "Quiz ID is missing!" };
         if (!answersJson) return { success: false, error: "Answers data is missing!" };
 
-        // String ko wapas Object me convert karo
+
+
         const studentAnswers = JSON.parse(answersJson);
 
         const session = await getServerSession(authOptions);
@@ -123,12 +122,12 @@ export async function submitExam(quizId: string, answersJson: string) {
 
             if (studentAns !== undefined && studentAns !== null && studentAns !== "") {
                 if (question.type === "SINGLE_CORRECT") {
-                    const correctOpt = question.options.find((o: any) => o.isCorrect); // eslint-disable-line @typescript-eslint/no-explicit-any
+                    const correctOpt = question.options.find((o: any) => o.isCorrect);
                     if (correctOpt && correctOpt.id === studentAns) isCorrect = true;
                     formattedOptions = [studentAns as string];
                 }
                 else if (question.type === "MULTI_CORRECT") {
-                    const correctOpts = question.options.filter((o: any) => o.isCorrect).map((o: any) => o.id); // eslint-disable-line @typescript-eslint/no-explicit-any
+                    const correctOpts = question.options.filter((o: any) => o.isCorrect).map((o: any) => o.id);
                     const studentOpts = studentAns as string[];
                     if (studentOpts.length === correctOpts.length && studentOpts.every(id => correctOpts.includes(id))) {
                         isCorrect = true;
@@ -136,7 +135,7 @@ export async function submitExam(quizId: string, answersJson: string) {
                     formattedOptions = studentOpts;
                 }
                 else if (question.type === "FILL_IN_BLANK" || question.type === "INTEGER_TYPE") {
-                    const exactAnswer = (question as any).correctAnswer; // eslint-disable-line @typescript-eslint/no-explicit-any
+                    const exactAnswer = (question as any).correctAnswer;
                     if (exactAnswer) {
                         const sanitizedStudentAns = String(studentAns).trim().toUpperCase().replace(/\s+/g, ' ');
                         const sanitizedExactAns = String(exactAnswer).trim().toUpperCase().replace(/\s+/g, ' ');
@@ -229,7 +228,7 @@ export async function getStudentHistory() {
     }
 }
 
-// 2. PDF ke liye detail data laane ke liye (Sirf tab chalega jab test COMPLETED ho)
+
 export async function getDetailedResultForPDF(quizId: string) {
     try {
         const session = await getServerSession(authOptions);
@@ -248,7 +247,7 @@ export async function getDetailedResultForPDF(quizId: string) {
 
         if (!quiz) return { success: false, error: "Quiz not found" };
 
-        // 🔥 SECURITY CHECK: Test khatam hone ke baad hi answer key milegi
+
         if (quiz.status !== "COMPLETED") {
             return { success: false, error: "Answer key will be available only after the professor ends the test." };
         }
@@ -260,27 +259,27 @@ export async function getDetailedResultForPDF(quizId: string) {
 }
 
 
-// 3. LIVE GUIDED MODE: Submit a single answer for one question with speed-based scoring
+
 export async function submitLiveAnswer(
     quizId: string,
     questionId: string,
-    answer: string, // optionId for MCQ, text for others
-    answerType: string, // SINGLE_CORRECT, MULTI_CORRECT, etc.
-    timeTaken: number // seconds taken to answer
+    answer: string,
+    answerType: string,
+    timeTaken: number
 ) {
     try {
         const session = await getServerSession(authOptions);
         if (!session || session.user.role !== "STUDENT") return { success: false, error: "Unauthorized" };
         const studentId = session.user.id;
 
-        // Get the question details for evaluation
+
         const question = await prisma.question.findUnique({
             where: { id: questionId },
             include: { options: true }
         });
         if (!question) return { success: false, error: "Question not found" };
 
-        // Evaluate correctness
+
         let isCorrect = false;
         let formattedTextResponse: string | null = null;
         let formattedOptions: string[] = [];
@@ -420,7 +419,7 @@ export async function getLiveLeaderboardForStudent(quizId: string) {
 
         // Top 3 for podium display
         const top3 = leaderboard.slice(0, 3);
-        
+
         // Find current student's stats
         const myStats = leaderboard.find(l => l.studentId === studentId);
 

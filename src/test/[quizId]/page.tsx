@@ -19,7 +19,7 @@ export default function ExamRoom() {
     const [quiz, setQuiz] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
-    // Exam States
+
     const [currentIndex, setCurrentIndex] = useState(0);
     const [answers, setAnswers] = useState<Record<string, any>>({});
     const [timeLeft, setTimeLeft] = useState<number>(0);
@@ -29,10 +29,10 @@ export default function ExamRoom() {
     useEffect(() => {
         const fetchQuiz = async () => {
             const res = await getQuizForStudent(quizId);
-            // 🔥 FIX: Added '&& res.quiz' to satisfy TypeScript strict mode
+
             if (res.success && res.quiz) {
                 setQuiz(res.quiz);
-                setTimeLeft(res.quiz.questions[0].timeLimit); // Pehle question ka timer
+                setTimeLeft(res.quiz.questions[0].timeLimit);
             } else {
                 toast.error(res.error || "Failed to load quiz");
                 router.push("/student");
@@ -42,7 +42,7 @@ export default function ExamRoom() {
         fetchQuiz();
     }, [quizId, router]);
 
-    // Anti-Cheat: Tab Switch Warning
+
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.hidden && !examFinished && quiz) {
@@ -53,14 +53,14 @@ export default function ExamRoom() {
         return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
     }, [examFinished, quiz]);
 
-    // Timer Logic
+
     useEffect(() => {
         if (loading || examFinished || !quiz) return;
 
         const timer = setInterval(() => {
             setTimeLeft((prev) => {
                 if (prev <= 1) {
-                    handleNextQuestion(); // Time khatam toh automatically next!
+                    handleNextQuestion();
                     return 0;
                 }
                 return prev - 1;
@@ -74,9 +74,9 @@ export default function ExamRoom() {
         if (!quiz) return;
         if (currentIndex < quiz.questions.length - 1) {
             setCurrentIndex((prev) => prev + 1);
-            setTimeLeft(quiz.questions[currentIndex + 1].timeLimit); // Reset timer for new question
+            setTimeLeft(quiz.questions[currentIndex + 1].timeLimit);
         } else {
-            handleSubmitExam(); // Aakhri question pe time out toh submit
+            handleSubmitExam();
         }
     };
 
@@ -87,7 +87,7 @@ export default function ExamRoom() {
                 if (currentArr.includes(value)) return { ...prev, [questionId]: currentArr.filter((id: string) => id !== value) };
                 else return { ...prev, [questionId]: [...currentArr, value] };
             }
-            return { ...prev, [questionId]: value }; // For Single Correct & Text
+            return { ...prev, [questionId]: value };
         });
     };
 
@@ -97,7 +97,7 @@ export default function ExamRoom() {
         setExamFinished(true);
 
         try {
-            // 🔥 String me convert kar diya: Ab drop hone ka koi chance nahi!
+
             const answersString = JSON.stringify(answers);
 
             const res = await submitExam(quiz.id, answersString);
@@ -123,7 +123,7 @@ export default function ExamRoom() {
     const currentQ = quiz.questions[currentIndex];
     const isLastQuestion = currentIndex === quiz.questions.length - 1;
 
-    // Format time (MM:SS)
+
     const formatTime = (seconds: number) => {
         const m = Math.floor(seconds / 60);
         const s = seconds % 60;
@@ -133,24 +133,23 @@ export default function ExamRoom() {
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
 
-            {/* Top Bar (Sticky) */}
+
             <header className="sticky top-0 z-50 bg-white border-b shadow-sm px-4 md:px-8 py-3 flex justify-between items-center">
                 <div>
                     <h1 className="font-bold text-gray-900 truncate max-w-[200px] md:max-w-md">{quiz.title}</h1>
                     <p className="text-xs text-gray-500 font-medium">Question {currentIndex + 1} of {quiz.questions.length}</p>
                 </div>
 
-                {/* Timer UI */}
+
                 <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full font-mono text-lg font-bold border-2 ${timeLeft <= 10 ? 'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-blue-50 text-blue-700 border-blue-200'
                     }`}>
                     <Timer className="h-5 w-5" /> {formatTime(timeLeft)}
                 </div>
             </header>
 
-            {/* Main Exam Area */}
             <main className="flex-1 max-w-3xl w-full mx-auto p-4 md:p-8 flex flex-col">
 
-                {/* Question Card */}
+
                 <Card className="shadow-md border-t-4 border-t-blue-600 flex-1">
                     <CardContent className="p-6 md:p-8 flex flex-col h-full">
 
@@ -168,10 +167,10 @@ export default function ExamRoom() {
                             <img src={currentQ.imageUrl} alt="Question Reference" className="mt-4 max-h-64 object-contain rounded-lg border bg-gray-50 p-2" />
                         )}
 
-                        {/* Options Area */}
+
                         <div className="mt-8 space-y-3 flex-1">
 
-                            {/* Single Correct */}
+
                             {currentQ.type === "SINGLE_CORRECT" && currentQ.options.map((opt: any) => (
                                 <div
                                     key={opt.id}
@@ -186,7 +185,7 @@ export default function ExamRoom() {
                                 </div>
                             ))}
 
-                            {/* Multi Correct */}
+
                             {currentQ.type === "MULTI_CORRECT" && currentQ.options.map((opt: any) => (
                                 <div
                                     key={opt.id}
@@ -202,7 +201,7 @@ export default function ExamRoom() {
                                 </div>
                             ))}
 
-                            {/* Fill in Blank / Integer */}
+
                             {(currentQ.type === "FILL_IN_BLANK" || currentQ.type === "INTEGER_TYPE") && (
                                 <Input
                                     type={currentQ.type === "INTEGER_TYPE" ? "number" : "text"}
@@ -213,7 +212,7 @@ export default function ExamRoom() {
                                 />
                             )}
 
-                            {/* Descriptive */}
+
                             {currentQ.type === "DESCRIPTIVE" && (
                                 <Textarea
                                     placeholder="Write your detailed answer here..."
@@ -224,7 +223,6 @@ export default function ExamRoom() {
                             )}
                         </div>
 
-                        {/* Bottom Actions */}
                         <div className="mt-8 flex justify-between items-center pt-6 border-t">
                             <Button
                                 variant="outline"

@@ -7,7 +7,6 @@ import { CalendarClock, Users, BookOpen, PlusCircle, Activity, BarChart, Copy } 
 
 export const dynamic = "force-dynamic";
 
-// Server Component: Yeh page load hote hi direct Database se data le aayega
 export default async function ProfessorDashboard() {
     const result = await getProfessorQuizzes();
     const quizzes = result.success ? result.quizzes : [];
@@ -15,7 +14,7 @@ export default async function ProfessorDashboard() {
     return (
         <div className="max-w-6xl mx-auto space-y-8">
 
-            {/* Header Section */}
+
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl shadow-sm border">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900">Professor Dashboard 👨‍🏫</h1>
@@ -28,7 +27,7 @@ export default async function ProfessorDashboard() {
                 </Link>
             </div>
 
-            {/* Quizzes Grid */}
+
             <div className="space-y-4">
                 <h2 className="text-xl font-semibold text-gray-800">Your Recent Quizzes</h2>
 
@@ -43,7 +42,6 @@ export default async function ProfessorDashboard() {
                         {quizzes?.map((quiz: any) => (
                             <Card key={quiz.id} className="hover:shadow-md transition-shadow relative overflow-hidden group">
 
-                                {/* Status Indicator Bar at Top */}
                                 <div className={`h-1.5 w-full absolute top-0 left-0 ${quiz.status === 'LIVE' ? 'bg-green-500' :
                                     quiz.status === 'COMPLETED' ? 'bg-gray-500' : 'bg-yellow-400'
                                     }`} />
@@ -57,7 +55,6 @@ export default async function ProfessorDashboard() {
                                             {quiz.status}
                                         </Badge>
 
-                                        {/* Join Code Display */}
                                         <div className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded text-sm font-mono font-bold text-gray-700 border group-hover:border-blue-200 transition-colors">
                                             {quiz.code}
                                         </div>
@@ -86,7 +83,7 @@ export default async function ProfessorDashboard() {
 
                                 <CardFooter className="pt-2 border-t bg-gray-50/50 flex gap-2">
                                     {quiz.status === "LIVE" ? (
-                                        // 🔥 FIX: Yaha link update kar diya hai "history" wale page par
+
                                         <Link href={`/professor/history/${quiz.id}`} className="flex-1">
                                             <Button variant="outline" className="w-full border-green-200 text-green-700 hover:bg-green-50 gap-2">
                                                 <Activity className="h-4 w-4" /> Manage Live Test

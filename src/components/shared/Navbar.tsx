@@ -39,10 +39,8 @@ export function Navbar() {
         <nav className="sticky top-0 z-50 w-full border-b bg-white shadow-sm">
             <div className="flex h-16 items-center px-4 md:px-8 justify-between">
 
-                {/* Left Side: Mobile Hamburger & Logo */}
                 <div className="flex items-center gap-2 md:gap-4">
 
-                    {/* Mobile Menu Trigger (Only visible on small screens) */}
                     <div className="md:hidden">
                         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                             <SheetTrigger asChild>
@@ -64,7 +62,7 @@ export function Navbar() {
                                             <Link
                                                 key={link.href}
                                                 href={link.href}
-                                                onClick={() => setIsMobileMenuOpen(false)} // Click karne pe menu band ho jaye
+                                                onClick={() => setIsMobileMenuOpen(false)}
                                             >
                                                 <span
                                                     className={`block px-4 py-3 rounded-md text-base font-medium transition-colors ${isActive
@@ -91,7 +89,7 @@ export function Navbar() {
                     </Link>
                 </div>
 
-                {/* Center: Desktop Navigation Links (Hidden on mobile) */}
+
                 <div className="hidden md:flex items-center space-x-2 flex-1 ml-8">
                     {links.map((link) => {
                         const isActive = pathname === link.href;
@@ -110,7 +108,7 @@ export function Navbar() {
                     })}
                 </div>
 
-                {/* Right Side: User Profile Dropdown (Visible on both) */}
+
                 <div className="flex items-center">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>

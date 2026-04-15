@@ -7,7 +7,7 @@ import { AlertTriangle, BookOpen, Clock, FileWarning, EyeOff, ShieldAlert, Badge
 export default function InstructionsPage() {
     return (
         <div className="max-w-5xl mx-auto px-4 py-8 space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
-            {/* Header */}
+
             <div className="text-center space-y-3 pb-6 border-b">
                 <h1 className="text-3xl md:text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-600 tracking-tight">
                     Platform Guidelines
@@ -23,11 +23,10 @@ export default function InstructionsPage() {
                     <TabsTrigger value="professor" className="rounded-full data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm text-base font-medium">For Professors</TabsTrigger>
                 </TabsList>
 
-                {/* --- STUDENT INSTRUCTIONS --- */}
                 <TabsContent value="student" className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-                        {/* How to attempt */}
+
                         <Card className="border-t-4 border-t-blue-500 shadow-lg hover:shadow-xl transition-shadow bg-white/50 backdrop-blur-sm">
                             <CardContent className="p-6 md:p-8 space-y-6">
                                 <div className="flex items-center gap-3">
@@ -63,11 +62,11 @@ export default function InstructionsPage() {
                     </div>
                 </TabsContent>
 
-                {/* --- PROFESSOR INSTRUCTIONS --- */}
+
                 <TabsContent value="professor" className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-                        {/* Creating Tests */}
+
                         <Card className="border-t-4 border-t-indigo-500 shadow-lg hover:shadow-xl transition-shadow bg-indigo-50/30">
                             <CardContent className="p-6 md:p-8 space-y-6">
                                 <div className="flex items-center gap-3">
@@ -105,7 +104,7 @@ export default function InstructionsPage() {
                             </CardContent>
                         </Card>
 
-                        {/* Going Live and Analytics */}
+
                         <Card className="border-t-4 border-t-emerald-500 shadow-lg hover:shadow-xl transition-shadow bg-emerald-50/30">
                             <CardContent className="p-6 md:p-8 space-y-6">
                                 <div className="flex items-center gap-3">

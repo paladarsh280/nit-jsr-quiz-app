@@ -62,22 +62,21 @@ export default function StudentHistoryPage() {
         doc.text(`Total Score: ${attempt.score}`, 20, yPos);
         yPos += 15;
 
-        // Questions Loop
+
         quiz.questions.forEach((q: any, index: number) => {
-            // Page overflow check (Agar page bhar gaya toh naya page add karo)
+
             if (yPos > pageHeight - 50) {
                 doc.addPage();
                 yPos = 20;
             }
 
-            // 1. Print Question Text
+
             doc.setFontSize(11);
             doc.setFont("helvetica", "bold");
             const qLines = doc.splitTextToSize(`Q${index + 1}. ${q.text}`, 170);
             doc.text(qLines, 20, yPos);
             yPos += (qLines.length * 6);
 
-            // 2. Print Options (Agar MCQ hai toh)
             doc.setFont("helvetica", "normal");
             doc.setFontSize(10);
             if (q.type === "SINGLE_CORRECT" || q.type === "MULTI_CORRECT") {
@@ -86,10 +85,10 @@ export default function StudentHistoryPage() {
                     doc.text(optLines, 20, yPos);
                     yPos += (optLines.length * 5);
                 });
-                yPos += 2; // Extra gap after options
+                yPos += 2;
             }
 
-            // 3. Resolve Answers
+
             let correctAnswerText = "N/A";
             let studentAnswerText = "Not Attempted";
 
@@ -107,7 +106,7 @@ export default function StudentHistoryPage() {
                     studentAnswerText = selectedTexts.join(", ");
                 }
             } else {
-                // 🔥 BUG FIX: Zero ya empty string ko properly handle karega
+
                 correctAnswerText = (q.correctAnswer !== null && q.correctAnswer !== undefined && q.correctAnswer !== "")
                     ? String(q.correctAnswer)
                     : "Manual Grading Required";
@@ -117,31 +116,31 @@ export default function StudentHistoryPage() {
                 }
             }
 
-            // 4. Print Student Answer
-            doc.setTextColor(100, 100, 100); // Gray color
+
+            doc.setTextColor(100, 100, 100);
             const stuAnsLines = doc.splitTextToSize(`Your Answer: ${studentAnswerText}`, 170);
             doc.text(stuAnsLines, 20, yPos);
             yPos += (stuAnsLines.length * 5);
 
-            // 5. Print Correct Answer
-            doc.setTextColor(0, 128, 0); // Green color
+
+            doc.setTextColor(0, 128, 0);
             const corrAnsLines = doc.splitTextToSize(`Correct Answer: ${correctAnswerText}`, 170);
             doc.text(corrAnsLines, 20, yPos);
             yPos += (corrAnsLines.length * 5);
 
-            // 6. Print Marks
-            if (marksGot > 0) doc.setTextColor(0, 128, 0); // Green if positive
-            else if (marksGot < 0) doc.setTextColor(200, 0, 0); // Red if negative
-            else doc.setTextColor(0, 0, 0); // Black if zero
+
+            if (marksGot > 0) doc.setTextColor(0, 128, 0);
+            else if (marksGot < 0) doc.setTextColor(200, 0, 0);
+            else doc.setTextColor(0, 0, 0);
 
             doc.setFont("helvetica", "bold");
             doc.text(`Marks Awarded: ${marksGot}`, 20, yPos);
-            yPos += 15; // Gap before next question
+            yPos += 15;
 
-            doc.setTextColor(0, 0, 0); // Reset color
+            doc.setTextColor(0, 0, 0);
         });
 
-        // Save File
+
         doc.save(`${quizTitle.replace(/\s+/g, "_")}_Report.pdf`);
         toast.success("Detailed Report Downloaded!");
         setDownloadingId(null);

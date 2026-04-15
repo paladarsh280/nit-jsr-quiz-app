@@ -4,7 +4,6 @@ import prisma from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-// Random 6 character code generator (e.g. A7X9BQ)
 function generateQuizCode() {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let code = "";
@@ -14,11 +13,11 @@ function generateQuizCode() {
     return code;
 }
 
-export async function createQuizAction(data: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+export async function createQuizAction(data: any) {
     try {
         const session = await getServerSession(authOptions);
 
-        // Security check: Sirf professor hi quiz bana sakta hai
+
         if (!session || session.user.role !== "PROFESSOR") {
             return { success: false, error: "Unauthorized access!" };
         }
@@ -26,7 +25,6 @@ export async function createQuizAction(data: any) { // eslint-disable-line @type
         const professorId = session.user.id;
         const uniqueCode = generateQuizCode();
 
-        // Prisma Transaction: Quiz aur uske andar ke Questions ek sath save honge
         const newQuiz = await prisma.quiz.create({
             data: {
                 title: data.title,
@@ -35,24 +33,22 @@ export async function createQuizAction(data: any) { // eslint-disable-line @type
                 endTime: new Date(data.endTime),
                 code: uniqueCode,
                 professorId: professorId,
-                status: "DRAFT", 
+                status: "DRAFT",
                 quizMode: data.quizMode || "NORMAL",
 
-                // Nested create: Har question ko loop karke save karenge
                 questions: {
-                    create: data.questions.map((q: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+                    create: data.questions.map((q: any) => ({
                         text: q.text,
-                        imageUrl: q.imageUrl || null, // 🔥 Image aayegi toh theek, warna null
+                        imageUrl: q.imageUrl || null,
                         type: q.type,
                         timeLimit: q.timeLimit,
                         marks: q.marks,
                         negative: q.negative,
-                        correctAnswer: (q.type === "FILL_IN_BLANK" || q.type === "INTEGER_TYPE") ? q.correctAnswer : null, // 🔥 Exact Answer save hoga
+                        correctAnswer: (q.type === "FILL_IN_BLANK" || q.type === "INTEGER_TYPE") ? q.correctAnswer : null,
 
-                        // Options sirf tabhi save honge jab MCQ type ho
                         options: (q.type === "SINGLE_CORRECT" || q.type === "MULTI_CORRECT")
                             ? {
-                                create: q.options.map((opt: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+                                create: q.options.map((opt: any) => ({
                                     text: opt.text,
                                     isCorrect: opt.isCorrect,
                                 }))
@@ -73,7 +69,7 @@ export async function createQuizAction(data: any) { // eslint-disable-line @type
 
 
 
-// src/actions/professor.ts me niche add karo:
+
 
 export async function getProfessorQuizzes() {
     try {
@@ -84,12 +80,12 @@ export async function getProfessorQuizzes() {
 
         const quizzes = await prisma.quiz.findMany({
             where: { professorId: session.user.id },
-            orderBy: { createdAt: "desc" }, // Naye quizzes upar aayenge
+            orderBy: { createdAt: "desc" },
             include: {
                 _count: {
                     select: {
-                        attempts: true, // Kitne bacho ne attempt kiya
-                        questions: true // Kitne questions hain
+                        attempts: true,
+                        questions: true
                     }
                 }
             },
@@ -105,11 +101,10 @@ export async function getProfessorQuizzes() {
 
 
 
-// src/actions/professor.ts me niche add karo:
 
 import { revalidatePath } from "next/cache";
 
-// 1. Ek specific Quiz ki saari details aur Results laane ke liye
+
 export async function getQuizStats(quizId: string) {
     try {
         const session = await getServerSession(authOptions);
@@ -119,7 +114,7 @@ export async function getQuizStats(quizId: string) {
             where: { id: quizId, professorId: session.user.id },
             include: {
                 questions: {
-                    orderBy: { createdAt: 'asc' } // 🔥 FIX: Same order as student side to keep activeQuestionIndex consistent
+                    orderBy: { createdAt: 'asc' }
                 },
                 attempts: {
                     include: {
@@ -127,7 +122,7 @@ export async function getQuizStats(quizId: string) {
                             select: { name: true, email: true }
                         }
                     },
-                    orderBy: { score: 'desc' } // Jiske zyada marks, wo upar
+                    orderBy: { score: 'desc' }
                 }
             }
         });
@@ -139,8 +134,6 @@ export async function getQuizStats(quizId: string) {
         return { success: false, error: "Failed to fetch stats" };
     }
 }
-
-// 2. Quiz ka Status change karne ke liye (Draft -> Live -> Completed)
 export async function updateQuizStatus(quizId: string, status: "DRAFT" | "LIVE" | "COMPLETED") {
     try {
         const session = await getServerSession(authOptions);
@@ -151,7 +144,6 @@ export async function updateQuizStatus(quizId: string, status: "DRAFT" | "LIVE" 
             data: { status }
         });
 
-        // 🔥 If professor ends the test, automatically finish all ongoing attempts
         if (status === "COMPLETED") {
             await prisma.studentAttempt.updateMany({
                 where: { quizId: quizId, isFinished: false },
@@ -159,7 +151,6 @@ export async function updateQuizStatus(quizId: string, status: "DRAFT" | "LIVE" 
             });
         }
 
-        // Cache clear karo taaki dashboard pe naya status dikhe
         revalidatePath("/professor");
         revalidatePath(`/professor/history/${quizId}`);
 
@@ -170,7 +161,6 @@ export async function updateQuizStatus(quizId: string, status: "DRAFT" | "LIVE" 
     }
 }
 
-// 3. Live Guided Mode: Advance to the next question
 export async function updateActiveQuestionIndex(quizId: string, index: number) {
     try {
         const session = await getServerSession(authOptions);
@@ -188,7 +178,6 @@ export async function updateActiveQuestionIndex(quizId: string, index: number) {
     }
 }
 
-// 4. Get question statistics — how many chose each option
 export async function getQuestionStats(quizId: string, questionId: string) {
     try {
         const session = await getServerSession(authOptions);
@@ -204,7 +193,6 @@ export async function getQuestionStats(quizId: string, questionId: string) {
             where: { question: { id: questionId }, attempt: { quizId } }
         });
 
-        // Count how many students chose each option
         const optionCounts: Record<string, number> = {};
         for (const opt of question.options) {
             optionCounts[opt.id] = 0;
@@ -231,7 +219,6 @@ export async function getQuestionStats(quizId: string, questionId: string) {
     }
 }
 
-// 5. Get leaderboard data for live quiz
 export async function getLeaderboardData(quizId: string) {
     try {
         const session = await getServerSession(authOptions);
@@ -258,4 +245,4 @@ export async function getLeaderboardData(quizId: string) {
         console.error(error);
         return { success: false, error: "Failed to get leaderboard" };
     }
-}
+}

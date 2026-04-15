@@ -22,42 +22,39 @@ export default function StudentDashboard() {
 
     const [isScanning, setIsScanning] = useState(false);
 
-    // Initialize QR Scanner when modal opens
+
     const startScanner = () => {
         setIsScanning(true);
         setTimeout(() => {
-            const scanner = new Html5QrcodeScanner("reader", { 
-                qrbox: { width: 250, height: 250 }, 
-                fps: 5 
+            const scanner = new Html5QrcodeScanner("reader", {
+                qrbox: { width: 250, height: 250 },
+                fps: 5
             }, false);
-            
+
             scanner.render((text) => {
                 scanner.clear();
                 setIsScanning(false);
                 handleScannedUrl(text);
             }, (err) => {
-                // Ignore continuous scan errors (normal behavior when no QR is in frame)
+
             });
         }, 100);
     };
 
     const stopScanner = () => {
         setIsScanning(false);
-        // We can't perfectly unmount the scanner immediately without html5-qrcode throwing,
-        // but removing it from the DOM handles most of it, we just let it die.
+
     };
 
     const handleScannedUrl = async (url: string) => {
         try {
-            // Expected URL format: http://domain.com/test/[quizId]
+
             const urlObj = new URL(url);
             const pathParts = urlObj.pathname.split('/');
-            // ["", "test", "cm8s32d8..."]
+
             if (pathParts[1] === 'test' && pathParts[2]) {
                 const scannedQuizId = pathParts[2];
-                // Since our join API takes a 6-letter `code`, but the QR encodes the `quizId`...
-                // Wait, if the URL routes directly to `/test/[quizId]`, we don't even need to verify the code here!
-                // The student just needs to be redirected to that URL. The test page itself handles verification if they are enrolled/etc.
+
                 toast.success("QR Code scanned automatically!");
                 router.push(`/test/${scannedQuizId}`);
             } else {
@@ -79,10 +76,9 @@ export default function StudentDashboard() {
         const result = await verifyAndJoinQuiz(code.trim());
 
         if (result.success) {
-            if (result.message) toast.info(result.message); // Resuming message
+            if (result.message) toast.info(result.message);
             else toast.success("Code Verified! Taking you to the exam room...");
 
-            // ✅ Agar code sahi hai, toh sidha Test Room me le jao (Yeh page hum next banayenge)
             setTimeout(() => {
                 router.push(`/test/${result.quizId}`);
             }, 1000);
@@ -96,7 +92,7 @@ export default function StudentDashboard() {
     return (
         <div className="max-w-4xl mx-auto space-y-8 pb-10">
 
-            {/* Welcome Section */}
+
             <div className="flex items-center gap-4 bg-white p-6 rounded-xl shadow-sm border border-l-4 border-l-green-500">
                 <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center shrink-0">
                     <GraduationCap className="h-8 w-8 text-green-600" />
@@ -111,7 +107,7 @@ export default function StudentDashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
-                {/* JOIN QUIZ CARD */}
+
                 <Card className="shadow-md border-t-4 border-t-blue-600">
                     <CardHeader className="text-center pb-2 pt-8">
                         <CardTitle className="text-3xl font-black text-gray-800 tracking-tight">Join a Quiz</CardTitle>
@@ -151,7 +147,6 @@ export default function StudentDashboard() {
                     </CardContent>
                 </Card>
 
-                {/* QUICK STATS / INFO CARD */}
                 <div className="space-y-4">
                     <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
                         <Clock className="h-5 w-5 text-gray-500" /> Important Instructions
@@ -176,7 +171,7 @@ export default function StudentDashboard() {
 
             </div>
 
-            {/* QR Scanner Modal */}
+            =
             {isScanning && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 transition-all">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
