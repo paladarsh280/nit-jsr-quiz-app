@@ -259,22 +259,21 @@ export default function ExamRoom() {
         if (!quiz || quiz.status !== "DRAFT") return;
 
 
-        const room = supabase.channel(`waiting_room_${quizId}`, {
-            config: {
-                presence: {
-                    key: "student_" + Math.random().toString(36).substring(7),
-                },
-            },
-        });
+        const room = supabase.channel(`waiting_room_${quizId}`);
+
+        const updateCount = () => {
+            const state = room.presenceState();
+            const count = Object.values(state).flat().filter((p: any) => p.role === 'student').length;
+            setWaitingUsers(count);
+        };
 
         room
-            .on("presence", { event: "sync" }, () => {
-                const presenceState = room.presenceState();
-                setWaitingUsers(Object.keys(presenceState).length);
-            })
+            .on("presence", { event: "sync" }, updateCount)
+            .on("presence", { event: "join" }, updateCount)
+            .on("presence", { event: "leave" }, updateCount)
             .subscribe(async (status) => {
                 if (status === "SUBSCRIBED") {
-                    await room.track({ joinedAt: Date.now() });
+                    await room.track({ role: "student", joinedAt: Date.now() });
                 }
             });
 

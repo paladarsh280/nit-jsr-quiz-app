@@ -34,12 +34,21 @@ export default function QuizDetailsPage() {
 
         const room = supabase.channel(`waiting_room_${quizId}`);
 
+        const updateCount = () => {
+            const state = room.presenceState();
+            const count = Object.values(state).flat().filter((p: any) => p.role === 'student').length;
+            setWaitingUsers(count);
+        };
+
         room
-            .on("presence", { event: "sync" }, () => {
-                const presenceState = room.presenceState();
-                setWaitingUsers(Object.keys(presenceState).length);
-            })
-            .subscribe();
+            .on("presence", { event: "sync" }, updateCount)
+            .on("presence", { event: "join" }, updateCount)
+            .on("presence", { event: "leave" }, updateCount)
+            .subscribe(async (status) => {
+                if (status === "SUBSCRIBED") {
+                    await room.track({ role: "professor", joinedAt: Date.now() });
+                }
+            });
 
         return () => {
             supabase.removeChannel(room);
@@ -132,11 +141,11 @@ export default function QuizDetailsPage() {
                 <div className="flex flex-col md:flex-row items-center gap-6 w-full md:w-auto">
                     {/* QR Code */}
                     <div className="flex flex-col items-center justify-center bg-gray-50 p-3 rounded-lg border hover:shadow-md transition-shadow">
-                        <QRCodeSVG 
-                            value={typeof window !== 'undefined' ? `${window.location.origin}/test/${quiz.id}` : ''} 
-                            size={120} 
-                            level="M" 
-                            includeMargin={false} 
+                        <QRCodeSVG
+                            value={typeof window !== 'undefined' ? `${window.location.origin}/test/${quiz.id}` : ''}
+                            size={120}
+                            level="M"
+                            includeMargin={false}
                         />
                         <span className="text-xs text-gray-500 mt-2 font-semibold tracking-wide uppercase">Scan to Join</span>
                     </div>
@@ -148,8 +157,8 @@ export default function QuizDetailsPage() {
                                 <div className="bg-blue-50/80 border border-blue-100 rounded-lg p-3 flex items-center justify-between shadow-sm animate-in fade-in zoom-in duration-300">
                                     <div className="flex items-center gap-2">
                                         <div className="relative flex h-3 w-3">
-                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                          <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
                                         </div>
                                         <span className="text-sm font-semibold text-blue-800">Students Waiting</span>
                                     </div>
