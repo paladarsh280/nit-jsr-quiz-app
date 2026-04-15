@@ -266,7 +266,7 @@ export default function LiveGuidedRoom() {
     const activeIndex = quiz.activeQuestionIndex;
     const currentQ = quiz.questions[activeIndex];
     const isLastQuestion = activeIndex >= quiz.questions.length - 1;
-    const sortedAttempts = [...quiz.attempts].sort((a: any, b: any) => b.score - a.score);
+    const sortedAttempts = [...quiz.attempts].sort((att1: any, att2: any) => att2.score - att1.score);
     const joinUrl = typeof window !== 'undefined' ? `${window.location.origin}/test/${quiz.id}` : '';
 
     return (
@@ -360,7 +360,7 @@ export default function LiveGuidedRoom() {
                                     {/* Bar Chart for Options */}
                                     <div className="max-w-lg mx-auto space-y-3">
                                         {questionStats.stats?.map((stat: any, idx: number) => {
-                                            const maxCount = Math.max(1, ...questionStats.stats.map((s: any) => s.count));
+                                            const maxCount = Math.max(1, ...questionStats.stats.map((statItem: any) => statItem.count));
                                             const percentage = (stat.count / maxCount) * 100;
                                             return (
                                                 <div key={stat.id} className="flex items-center gap-3">
@@ -383,7 +383,7 @@ export default function LiveGuidedRoom() {
                                     {/* Correct Answer */}
                                     <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-xl inline-block">
                                         <span className="text-green-800 font-bold text-lg">
-                                            ✅ Correct: {questionStats.stats?.filter((s: any) => s.isCorrect).map((s: any) => s.text).join(", ") || "N/A"}
+                                            ✅ Correct: {questionStats.stats?.filter((statItem: any) => statItem.isCorrect).map((statItem: any) => statItem.text).join(", ") || "N/A"}
                                         </span>
                                     </div>
                                 </div>
