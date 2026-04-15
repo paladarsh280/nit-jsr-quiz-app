@@ -15,9 +15,9 @@ import { supabase } from "@/lib/supabase";
 
 function toUTCMs(val: Date | string | unknown): number {
     if (val instanceof Date) return val.getTime();
-    const s = String(val);
+    const strVal = String(val);
 
-    return new Date(/Z|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z').getTime();
+    return new Date(/Z|[+-]\d{2}:?\d{2}$/.test(strVal) ? strVal : strVal + 'Z').getTime();
 }
 
 export default function ExamRoom() {
@@ -231,7 +231,7 @@ export default function ExamRoom() {
             }
         };
 
-        const interval = setInterval(poll, 3000);
+        const interval = setInterval(poll, 20000);
         return () => clearInterval(interval);
 
     }, [quizId, isLiveGuided, hasStarted, examFinished]);
@@ -285,7 +285,7 @@ export default function ExamRoom() {
             }
         };
 
-        const interval = setInterval(pollStatus, 3000);
+        const interval = setInterval(pollStatus, 20000);
 
         return () => {
             supabase.removeChannel(room);
@@ -461,8 +461,8 @@ export default function ExamRoom() {
 
     const formatTime = (seconds: number) => {
         const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        return `${m}:${s < 10 ? '0' : ''}${s}`;
+        const sec = seconds % 60;
+        return `${m}:${sec < 10 ? '0' : ''}${sec}`;
     };
 
 
