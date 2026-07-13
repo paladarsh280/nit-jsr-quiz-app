@@ -36,6 +36,7 @@ export default function ExamRoom() {
     const [examFinished, setExamFinished] = useState(false);
     const [hasStarted, setHasStarted] = useState(false);
     const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+    const [tabSwitches, setTabSwitches] = useState(0);
 
 
     const [liveAnswerSubmitted, setLiveAnswerSubmitted] = useState(false);
@@ -84,6 +85,7 @@ export default function ExamRoom() {
                             if (parsed.questionStartTime) setQuestionStartTime(parsed.questionStartTime);
                             if (parsed.examStartTime) setExamStartTime(parsed.examStartTime);
                             if (parsed.hasStarted) setHasStarted(parsed.hasStarted);
+                            if (parsed.tabSwitches) setTabSwitches(parsed.tabSwitches);
                         } catch { /* ignore */ }
                     }
 
@@ -107,6 +109,7 @@ export default function ExamRoom() {
                             }
                             
                             if (parsed.hasStarted) setHasStarted(parsed.hasStarted);
+                            if (parsed.tabSwitches) setTabSwitches(parsed.tabSwitches);
                         } catch {
                             setTimeLeft((res.quiz.timeLimit || 60) * 60);
                         }
@@ -296,13 +299,14 @@ export default function ExamRoom() {
                 liveAnswerResult,
                 questionStartTime,
                 examStartTime,
-                hasStarted
+                hasStarted,
+                tabSwitches
             }));
             const t1 = setTimeout(() => setSaveStatus("saved"), 500);
             const t2 = setTimeout(() => setSaveStatus("idle"), 2000);
             return () => { clearTimeout(t1); clearTimeout(t2); };
         }
-    }, [currentIndex, answers, tempAnswers, timeLeft, loading, quiz, examFinished, quizId, hasStarted, examStartTime]);
+    }, [currentIndex, answers, tempAnswers, timeLeft, loading, quiz, examFinished, quizId, hasStarted, examStartTime, tabSwitches]);
 
 
     useEffect(() => {
@@ -401,6 +405,19 @@ export default function ExamRoom() {
         const handleVisibility = () => {
             if (document.visibilityState === "visible") {
                 handleTick();
+            } else if (document.visibilityState === "hidden") {
+                if (!examFinished && hasStarted && !isLiveGuided) {
+                    setTabSwitches(prev => {
+                        const next = prev + 1;
+                        if (next >= 4) {
+                            toast.error("Exam Auto-Submitted due to multiple tab switches!", { id: "cheat-submit", duration: 5000 });
+                            handleSubmitExamRef.current?.(true);
+                        } else {
+                            toast.error(`WARNING ${next}/3: Tab switching or minimizing is NOT allowed! Your exam will be auto-submitted on the 4th violation.`, { id: "cheat-warn", duration: 5000 });
+                        }
+                        return next;
+                    });
+                }
             }
         };
         document.addEventListener("visibilitychange", handleVisibility);
@@ -542,8 +559,9 @@ export default function ExamRoom() {
         <div className="min-h-screen bg-gray-50 dark:bg-white/5 dark:backdrop-blur-md flex flex-col relative">
 
             {!hasStarted && !examFinished && (
-                <div className="absolute inset-0 z-[200] bg-white dark:bg-white/5 dark:backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
-                    <Maximize className="h-16 w-16 text-blue-600 dark:text-blue-500 mb-6" />
+                <div className="absolute inset-0 z-[200] bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
+                    <div className="bg-white dark:bg-slate-900 p-10 rounded-3xl shadow-2xl border dark:border-slate-800 flex flex-col items-center max-w-lg w-full">
+                        <Maximize className="h-16 w-16 text-blue-600 dark:text-blue-500 mb-6" />
                     <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Ready to Begin?</h2>
                     <p className="text-gray-600 dark:text-gray-400 max-w-md mb-4">
                         {isLiveGuided
@@ -563,10 +581,14 @@ export default function ExamRoom() {
                             setHasStarted(true);
                             setQuestionStartTime(Date.now());
                             setExamStartTime(Date.now());
+                            if (document.documentElement.requestFullscreen) {
+                                document.documentElement.requestFullscreen().catch(() => console.log("Fullscreen blocked"));
+                            }
                         }}
                     >
                         {isLiveGuided ? "Join Live Quiz" : "Start Exam"}
                     </Button>
+                    </div>
                 </div>
             )}
 
@@ -898,8 +920,8 @@ export default function ExamRoom() {
             </main>
 
             {showResultModal && (
-                <div className="fixed inset-0 z-[300] bg-black/60 dark:bg-white/5 dark:backdrop-blur-md/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
-                    <div className="bg-white dark:bg-white/5 dark:backdrop-blur-md p-10 rounded-3xl shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-300 border dark:border-slate-800">
+                <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
+                    <div className="bg-white dark:bg-slate-900 p-10 rounded-3xl shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-300 border dark:border-slate-800">
                         <div className="h-20 w-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
                             <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
                         </div>

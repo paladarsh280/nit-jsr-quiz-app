@@ -40,7 +40,7 @@ export default function CreateTestPage() {
     const [description, setDescription] = useState("");
     const [startTime, setStartTime] = useState("");
     const [endTime, setEndTime] = useState("");
-    const [quizMode, setQuizMode] = useState<"NORMAL" | "LIVE_GUIDED">("LIVE_GUIDED");
+    const [quizMode, setQuizMode] = useState<"NORMAL" | "LIVE_GUIDED">("NORMAL");
     const [timeLimit, setTimeLimit] = useState<number>(60); // Default 60 minutes for NORMAL quiz
     const [questions, setQuestions] = useState<Question[]>([]);
     const [isMounted, setIsMounted] = useState(false);
