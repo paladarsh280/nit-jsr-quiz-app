@@ -28,13 +28,13 @@ export function PremiumLoader({ text = "Loading..." }: { text?: string }) {
             </div>
 
             {/* Text */}
-            <span className="text-[20px] font-extrabold tracking-tight"
-                style={{ color: "#1e1b4b", animation: "textFade 2.2s ease-in-out infinite" }}>
+            <span className="text-[20px] font-extrabold tracking-tight text-indigo-950 dark:text-indigo-100"
+                style={{ animation: "textFade 2.2s ease-in-out infinite" }}>
                 {text}
             </span>
 
             {/* Shimmer bar */}
-            <div className="w-[160px] h-[2px] rounded-full overflow-hidden" style={{ background: "#e0e7ff" }}>
+            <div className="w-[160px] h-[2px] rounded-full overflow-hidden bg-indigo-100 dark:bg-indigo-950">
                 <div className="h-full w-1/2 rounded-full"
                     style={{
                         background: "linear-gradient(90deg, transparent, #6366f1, transparent)",

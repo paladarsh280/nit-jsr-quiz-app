@@ -150,16 +150,16 @@ export default function StudentHistoryPage() {
 
     return (
         <div className="max-w-5xl mx-auto space-y-6 pb-20">
-            <div className="bg-white p-6 rounded-xl border shadow-sm flex items-center gap-4">
-                <BookOpen className="h-10 w-10 text-blue-600" />
+            <div className="bg-white dark:bg-white/5 dark:backdrop-blur-md p-6 rounded-xl border dark:border-slate-800 shadow-sm flex items-center gap-4">
+                <BookOpen className="h-10 w-10 text-blue-600 dark:text-blue-500" />
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">My Exam History</h1>
-                    <p className="text-gray-500">View your past results and download answer keys.</p>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">My Exam History</h1>
+                    <p className="text-gray-500 dark:text-gray-400">View your past results and download answer keys.</p>
                 </div>
             </div>
 
             {attempts.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-xl border border-dashed text-gray-500">
+                <div className="text-center py-20 bg-white dark:bg-white/5 dark:backdrop-blur-md rounded-xl border border-dashed dark:border-slate-700 text-gray-500 dark:text-gray-400">
                     You haven't attempted any quizzes yet.
                 </div>
             ) : (
@@ -168,15 +168,15 @@ export default function StudentHistoryPage() {
                         const isCompleted = attempt.quiz.status === "COMPLETED";
 
                         return (
-                            <Card key={attempt.id} className="hover:shadow-md transition-all">
-                                <CardHeader className="pb-3 border-b bg-gray-50/50">
+                            <Card key={attempt.id} className="hover:shadow-md transition-all dark:bg-white/5 dark:backdrop-blur-md dark:border-slate-800">
+                                <CardHeader className="pb-3 border-b dark:border-slate-800 bg-gray-50/50 dark:bg-white/5">
                                     <div className="flex justify-between items-start">
-                                        <CardTitle className="text-lg font-bold text-gray-800 line-clamp-1">{attempt.quiz.title}</CardTitle>
-                                        <Badge variant="outline" className={isCompleted ? "bg-gray-100 text-gray-700" : "bg-green-100 text-green-700"}>
+                                        <CardTitle className="text-lg font-bold text-gray-800 dark:text-gray-100 line-clamp-1">{attempt.quiz.title}</CardTitle>
+                                        <Badge variant="outline" className={isCompleted ? "bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300" : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/50"}>
                                             {attempt.quiz.status}
                                         </Badge>
                                     </div>
-                                    <div className="flex items-center gap-2 text-sm text-gray-500 mt-2">
+                                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-2">
                                         <Clock className="h-4 w-4" />
                                         {new Date(attempt.startedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                                     </div>
@@ -184,22 +184,22 @@ export default function StudentHistoryPage() {
 
                                 <CardContent className="pt-6 space-y-6">
                                     <div className="text-center">
-                                        <p className="text-sm text-gray-500 font-medium uppercase tracking-wider mb-1">Total Score</p>
-                                        <p className="text-4xl font-black text-blue-600">{attempt.score}</p>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">Total Score</p>
+                                        <p className="text-4xl font-black text-blue-600 dark:text-blue-400">{attempt.score}</p>
                                     </div>
 
                                     {isCompleted ? (
                                         <Button
                                             onClick={() => handleDownloadPDF(attempt.quizId, attempt.quiz.title)}
                                             disabled={downloadingId === attempt.quizId}
-                                            className="w-full gap-2 bg-gray-900 hover:bg-gray-800"
+                                            className="w-full gap-2 bg-gray-900 dark:bg-gray-100 dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200"
                                         >
                                             {downloadingId === attempt.quizId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                                             Download Detailed Result (PDF)
                                         </Button>
                                     ) : (
-                                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex gap-3 items-start text-sm text-yellow-800">
-                                            <Lock className="h-5 w-5 shrink-0 text-yellow-600" />
+                                        <div className="p-3 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-900/50 rounded-lg flex gap-3 items-start text-sm text-yellow-800 dark:text-yellow-500">
+                                            <Lock className="h-5 w-5 shrink-0 text-yellow-600 dark:text-yellow-500" />
                                             <p>Answer key and PDF will be unlocked once the professor officially ends this test.</p>
                                         </div>
                                     )}

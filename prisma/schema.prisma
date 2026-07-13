@@ -57,6 +57,7 @@ model Quiz {
   endTime             DateTime?  
   quizMode            String     @default("NORMAL") // "NORMAL" or "LIVE_GUIDED"
   activeQuestionIndex Int        @default(0)
+  timeLimit           Int        @default(0) // Total time limit for NORMAL quizzes in minutes
   
   professorId String
   professor   User       @relation("ProfessorQuizzes", fields: [professorId], references: [id], onDelete: Cascade)
@@ -111,6 +112,7 @@ model StudentAttempt {
   quiz       Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
 
   answers    StudentAnswer[]
+  timeTakenMs Int       @default(0) // Tracks exact milliseconds taken for the quiz
 
   @@unique([studentId, quizId]) 
 }

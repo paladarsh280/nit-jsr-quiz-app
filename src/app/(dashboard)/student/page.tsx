@@ -93,25 +93,25 @@ export default function StudentDashboard() {
         <div className="max-w-4xl mx-auto space-y-8 pb-10">
 
 
-            <div className="flex items-center gap-4 bg-white p-6 rounded-xl shadow-sm border border-l-4 border-l-green-500">
-                <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center shrink-0">
-                    <GraduationCap className="h-8 w-8 text-green-600" />
+            <div className="flex items-center gap-4 bg-white dark:bg-white/5 dark:backdrop-blur-md p-6 rounded-xl shadow-sm border dark:border-slate-800 border-l-4 border-l-green-500">
+                <div className="h-16 w-16 bg-green-100 dark:bg-green-900/40 rounded-full flex items-center justify-center shrink-0">
+                    <GraduationCap className="h-8 w-8 text-green-600 dark:text-green-400" />
                 </div>
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                         Welcome, {session?.user?.name?.split(" ")[0] || "Student"}! 🎓
                     </h1>
-                    <p className="text-gray-500">Enter your professor's code to join a live quiz.</p>
+                    <p className="text-gray-500 dark:text-gray-400">Enter your professor's code to join a live quiz.</p>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
 
-                <Card className="shadow-md border-t-4 border-t-blue-600">
+                <Card className="shadow-md border-t-4 border-t-blue-600 dark:bg-white/5 dark:backdrop-blur-md dark:border-slate-800 dark:border-t-blue-600">
                     <CardHeader className="text-center pb-2 pt-8">
-                        <CardTitle className="text-3xl font-black text-gray-800 tracking-tight">Join a Quiz</CardTitle>
-                        <CardDescription className="text-base mt-2">
+                        <CardTitle className="text-3xl font-black text-gray-800 dark:text-gray-100 tracking-tight">Join a Quiz</CardTitle>
+                        <CardDescription className="text-base mt-2 dark:text-gray-400">
                             Enter the 6-character code provided by your professor.
                         </CardDescription>
                     </CardHeader>
@@ -122,7 +122,7 @@ export default function StudentDashboard() {
                                     placeholder="e.g. A7X9BQ"
                                     value={code}
                                     onChange={(e) => setCode(e.target.value.toUpperCase())}
-                                    className="text-center text-3xl font-mono tracking-[0.25em] h-16 uppercase placeholder:text-gray-300 border-2 focus-visible:ring-blue-500"
+                                    className="text-center text-3xl font-mono tracking-[0.25em] h-16 uppercase placeholder:text-gray-300 dark:placeholder:text-gray-600 border-2 dark:border-slate-700 focus-visible:ring-blue-500 dark:bg-white/5 dark:backdrop-blur-md"
                                     maxLength={6}
                                 />
                             </div>
@@ -148,11 +148,11 @@ export default function StudentDashboard() {
                 </Card>
 
                 <div className="space-y-4">
-                    <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-gray-500" /> Important Instructions
+                    <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-gray-500 dark:text-gray-400" /> Important Instructions
                     </h2>
-                    <Card className="bg-blue-50/50 border-blue-100">
-                        <CardContent className="p-6 space-y-4 text-sm text-gray-700">
+                    <Card className="bg-blue-50/50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/30">
+                        <CardContent className="p-6 space-y-4 text-sm text-gray-700 dark:text-gray-300">
                             <div className="flex gap-3">
                                 <CheckCircle2 className="h-5 w-5 text-blue-500 shrink-0" />
                                 <p>Ensure you have a stable internet connection before joining.</p>
@@ -173,17 +173,17 @@ export default function StudentDashboard() {
 
             =
             {isScanning && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 transition-all">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="flex justify-between items-center p-4 border-b">
-                            <h3 className="text-xl font-bold flex items-center gap-2"><QrCode className="h-5 w-5" /> Scan to Join</h3>
-                            <Button variant="ghost" size="icon" onClick={stopScanner} className="hover:bg-red-50 hover:text-red-500">
+                <div className="fixed inset-0 z-50 bg-black/80 dark:bg-white/5 dark:backdrop-blur-md/90 backdrop-blur-sm flex items-center justify-center p-4 transition-all">
+                    <div className="bg-white dark:bg-white/5 dark:backdrop-blur-md rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center p-4 border-b dark:border-slate-800">
+                            <h3 className="text-xl font-bold flex items-center gap-2 dark:text-gray-100"><QrCode className="h-5 w-5" /> Scan to Join</h3>
+                            <Button variant="ghost" size="icon" onClick={stopScanner} className="hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-500">
                                 <X className="h-5 w-5" />
                             </Button>
                         </div>
                         <div className="p-6">
                             <div id="reader" className="w-full mx-auto rounded-xl overflow-hidden [&_video]:rounded-xl [&_video]:object-cover" />
-                            <p className="text-center text-sm text-gray-500 mt-4">
+                            <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
                                 Point your camera at the professor's screen
                             </p>
                         </div>

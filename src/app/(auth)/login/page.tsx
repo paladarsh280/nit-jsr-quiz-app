@@ -12,18 +12,18 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-gray-50 p-4">
-            <div className="absolute inset-0 bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-50"></div>
+        <div className="min-h-screen w-full flex items-center justify-center bg-gray-50 dark:bg-background p-4">
+            <div className="absolute inset-0 bg-white dark:bg-background bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-50 dark:opacity-40"></div>
 
             <Card className="w-full max-w-md shadow-xl relative z-10 border-t-4 border-t-blue-600">
                 <CardHeader className="space-y-3 text-center flex flex-col items-center">
-                    <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center mb-2">
-                        <GraduationCap className="h-8 w-8 text-blue-600" />
+                    <div className="h-16 w-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-2">
+                        <GraduationCap className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <CardTitle className="text-2xl font-bold tracking-tight text-gray-900">
+                    <CardTitle className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
                         NIT JSR Quiz Portal
                     </CardTitle>
-                    <CardDescription className="text-gray-500 font-medium text-sm">
+                    <CardDescription className="text-gray-500 dark:text-gray-400 font-medium text-sm">
                         Sign in using your official @nitjsr.ac.in email
                     </CardDescription>
                 </CardHeader>
@@ -31,7 +31,7 @@ export default function LoginPage() {
                 <CardContent className="flex flex-col space-y-4 mt-4">
                     <Button
                         size="lg"
-                        className="w-full text-base bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 flex items-center justify-center gap-3 shadow-sm"
+                        className="w-full text-base bg-white dark:bg-white/5 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center justify-center gap-3 shadow-sm transition-all"
                         onClick={handleGoogleLogin}
                     >
 
@@ -56,7 +56,7 @@ export default function LoginPage() {
                         Continue with Google
                     </Button>
 
-                    <div className="text-center text-xs text-gray-500 mt-4">
+                    <div className="text-center text-xs text-gray-500 dark:text-gray-400 mt-4">
                         Authorized strictly for NIT Jamshedpur students and faculty.
                     </div>
                 </CardContent>

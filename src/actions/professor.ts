@@ -35,6 +35,7 @@ export async function createQuizAction(data: any) {
                 professorId: professorId,
                 status: "DRAFT",
                 quizMode: data.quizMode || "NORMAL",
+                timeLimit: data.timeLimit || 0,
 
                 questions: {
                     create: data.questions.map((q: any) => ({
@@ -122,7 +123,10 @@ export async function getQuizStats(quizId: string) {
                             select: { name: true, email: true }
                         }
                     },
-                    orderBy: { score: 'desc' }
+                    orderBy: [
+                        { score: 'desc' },
+                        { timeTakenMs: 'asc' }
+                    ]
                 }
             }
         });

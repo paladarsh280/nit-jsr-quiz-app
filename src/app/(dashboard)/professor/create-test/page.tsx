@@ -41,6 +41,7 @@ export default function CreateTestPage() {
     const [startTime, setStartTime] = useState("");
     const [endTime, setEndTime] = useState("");
     const [quizMode, setQuizMode] = useState<"NORMAL" | "LIVE_GUIDED">("LIVE_GUIDED");
+    const [timeLimit, setTimeLimit] = useState<number>(60); // Default 60 minutes for NORMAL quiz
     const [questions, setQuestions] = useState<Question[]>([]);
     const [isMounted, setIsMounted] = useState(false);
 
@@ -56,6 +57,7 @@ export default function CreateTestPage() {
                 if (parsed.startTime) setStartTime(parsed.startTime);
                 if (parsed.endTime) setEndTime(parsed.endTime);
                 if (parsed.quizMode) setQuizMode(parsed.quizMode);
+                if (parsed.timeLimit) setTimeLimit(parsed.timeLimit);
                 if (parsed.questions && Array.isArray(parsed.questions)) setQuestions(parsed.questions);
 
                 toast.success("Draft restored automatically!");
@@ -68,10 +70,10 @@ export default function CreateTestPage() {
 
     useEffect(() => {
         if (isMounted) {
-            const draftData = { title, description, startTime, endTime, quizMode, questions };
+            const draftData = { title, description, startTime, endTime, quizMode, timeLimit, questions };
             localStorage.setItem("quiz_draft_state", JSON.stringify(draftData));
         }
-    }, [title, description, startTime, endTime, quizMode, questions, isMounted]);
+    }, [title, description, startTime, endTime, quizMode, timeLimit, questions, isMounted]);
 
     const addQuestion = () => {
         const newQuestion: Question = {
@@ -207,9 +209,15 @@ export default function CreateTestPage() {
         if (new Date(endTime) <= new Date(startTime)) return toast.error("End time must be after start time!");
 
 
-        for (let i = 0; i < questions.length; i++) {
-            if (!questions[i].timeLimit || questions[i].timeLimit <= 0) {
-                return toast.error(`Question ${i + 1} cannot have a time limit of 0!`);
+        if (quizMode === "LIVE_GUIDED") {
+            for (let i = 0; i < questions.length; i++) {
+                if (!questions[i].timeLimit || questions[i].timeLimit <= 0) {
+                    return toast.error(`Question ${i + 1} cannot have a time limit of 0!`);
+                }
+            }
+        } else {
+            if (!timeLimit || timeLimit <= 0) {
+                return toast.error("Please enter a valid Total Quiz Time!");
             }
         }
 
@@ -218,10 +226,10 @@ export default function CreateTestPage() {
 
         const processedQuestions = questions.map((q) => ({
             ...q,
-            timeLimit: q.timeUnit === "MINUTES" ? q.timeLimit * 60 : q.timeLimit,
+            timeLimit: quizMode === "LIVE_GUIDED" ? (q.timeUnit === "MINUTES" ? q.timeLimit * 60 : q.timeLimit) : 0,
         }));
 
-        const quizData = { title, description, startTime, endTime, quizMode, questions: processedQuestions };
+        const quizData = { title, description, startTime, endTime, quizMode, timeLimit, questions: processedQuestions };
 
         const result = await createQuizAction(quizData);
 
@@ -239,7 +247,7 @@ export default function CreateTestPage() {
         <div className="max-w-4xl mx-auto pb-20 px-4 md:px-0 mt-4 md:mt-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Create New Test</h1>
+                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">Create New Test</h1>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
 
@@ -266,8 +274,8 @@ export default function CreateTestPage() {
 
             <div className="space-y-6 md:space-y-8">
 
-                <div className="bg-white p-4 md:p-6 rounded-xl border shadow-sm space-y-4">
-                    <h2 className="text-lg md:text-xl font-semibold flex items-center gap-2">
+                <div className="bg-white dark:bg-white/5 dark:backdrop-blur-md p-4 md:p-6 rounded-xl border dark:border-slate-800 shadow-sm space-y-4">
+                    <h2 className="text-lg md:text-xl font-semibold flex items-center gap-2 dark:text-gray-100">
                         <HelpCircle className="h-5 w-5 text-blue-500" /> Basic Details
                     </h2>
                     <Separator />
@@ -289,26 +297,33 @@ export default function CreateTestPage() {
                             <Select value={quizMode} onValueChange={(val: any) => setQuizMode(val)}>
                                 <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
                                 <SelectContent>
+                                <SelectItem value="NORMAL">Standard Exam</SelectItem>
                                     <SelectItem value="LIVE_GUIDED">Live Guided (Menti-style)</SelectItem>
                                     <SelectItem value="NORMAL">Standard Exam</SelectItem>
 
                                 </SelectContent>
                             </Select>
                         </div>
+                        {quizMode === "NORMAL" && (
+                            <div className="space-y-2">
+                                <Label>Total Quiz Duration (Minutes) <span className="text-red-500">*</span></Label>
+                                <Input type="number" min="1" placeholder="e.g. 60" value={timeLimit} onChange={(e) => setTimeLimit(parseInt(e.target.value) || 0)} />
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 <div className="space-y-4">
-                    <h2 className="text-lg md:text-xl font-semibold flex items-center gap-2">
+                    <h2 className="text-lg md:text-xl font-semibold flex items-center gap-2 dark:text-gray-100">
                         <HelpCircle className="h-5 w-5 text-blue-500" /> Questions ({questions.length})
                     </h2>
 
                     {questions.map((q, index) => (
-                        <div key={q.id} className="bg-white p-4 md:p-6 rounded-xl border shadow-sm relative">
+                        <div key={q.id} className="bg-white dark:bg-white/5 dark:backdrop-blur-md p-4 md:p-6 rounded-xl border dark:border-slate-800 shadow-sm relative">
 
-                            <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 border-b pb-2 md:border-none md:pb-0 gap-4">
-                                <Label className="text-base md:text-lg font-semibold text-gray-800">Question {index + 1}</Label>
-                                <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50 w-full md:w-auto" onClick={() => removeQuestion(q.id)}>
+                            <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 border-b dark:border-slate-800 pb-2 md:border-none md:pb-0 gap-4">
+                                <Label className="text-base md:text-lg font-semibold text-gray-800 dark:text-gray-100">Question {index + 1}</Label>
+                                <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 w-full md:w-auto" onClick={() => removeQuestion(q.id)}>
                                     <Trash2 className="h-4 w-4 md:mr-2" />
                                     <span className="hidden md:inline">Delete</span>
                                 </Button>
@@ -337,13 +352,13 @@ export default function CreateTestPage() {
                                                 />
                                                 <Label
                                                     htmlFor={`image-upload-${q.id}`}
-                                                    className="cursor-pointer inline-flex items-center gap-2 text-sm text-blue-600 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-md transition-colors"
+                                                    className="cursor-pointer inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 px-4 py-2 rounded-md transition-colors"
                                                 >
                                                     <Upload className="h-4 w-4" /> Upload Image
                                                 </Label>
                                             </div>
                                         ) : (
-                                            <div className="relative inline-block mt-2 border rounded-md p-1 bg-gray-50">
+                                            <div className="relative inline-block mt-2 border dark:border-slate-700 rounded-md p-1 bg-gray-50 dark:bg-white/5">
 
                                                 <img src={q.imageUrl} alt="Question Diagram" className="h-32 object-contain rounded-sm" />
                                                 <Button
@@ -360,11 +375,11 @@ export default function CreateTestPage() {
 
                                 </div>
 
-                                <div className="w-full md:w-64 space-y-4 bg-gray-50 p-4 rounded-lg md:bg-transparent md:p-0 border md:border-none">
+                                <div className="w-full md:w-64 space-y-4 bg-gray-50 dark:bg-white/5 p-4 rounded-lg md:bg-transparent md:dark:bg-transparent md:p-0 border dark:border-slate-700 md:border-none md:dark:border-none">
                                     <div className="space-y-2">
-                                        <Label className="text-xs text-gray-500 uppercase font-bold">Type</Label>
+                                        <Label className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold">Type</Label>
                                         <Select value={q.type} onValueChange={(val) => updateQuestion(q.id, "type", val)}>
-                                            <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
+                                            <SelectTrigger className="bg-white dark:bg-white/5 dark:backdrop-blur-md"><SelectValue /></SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="SINGLE_CORRECT">Single Correct</SelectItem>
                                                 <SelectItem value="MULTI_CORRECT">Multi Correct</SelectItem>
@@ -376,19 +391,21 @@ export default function CreateTestPage() {
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-2 col-span-2">
-                                            <Label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-1"><Clock className="h-3 w-3" /> Time Limit</Label>
-                                            <div className="flex gap-2">
-                                                <Input type="number" className="bg-white flex-1" value={q.timeLimit} onChange={(e) => updateQuestion(q.id, "timeLimit", parseInt(e.target.value) || 0)} />
-                                                <Select value={q.timeUnit || "SECONDS"} onValueChange={(val) => updateQuestion(q.id, "timeUnit", val)}>
-                                                    <SelectTrigger className="w-[120px] bg-white text-xs"><SelectValue /></SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="SECONDS">Seconds</SelectItem>
-                                                        <SelectItem value="MINUTES">Minutes</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
+                                        {quizMode === "LIVE_GUIDED" && (
+                                            <div className="space-y-2 col-span-2">
+                                                <Label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-1"><Clock className="h-3 w-3" /> Time Limit per Question</Label>
+                                                <div className="flex gap-2">
+                                                    <Input type="number" className="bg-white flex-1" value={q.timeLimit} onChange={(e) => updateQuestion(q.id, "timeLimit", parseInt(e.target.value) || 0)} />
+                                                    <Select value={q.timeUnit || "SECONDS"} onValueChange={(val) => updateQuestion(q.id, "timeUnit", val)}>
+                                                        <SelectTrigger className="w-[120px] bg-white text-xs"><SelectValue /></SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="SECONDS">Seconds</SelectItem>
+                                                            <SelectItem value="MINUTES">Minutes</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
                                         <div className="space-y-2">
                                             <Label className="text-xs text-gray-500 uppercase font-bold">Marks (+)</Label>
                                             <Input type="number" min="0" className="bg-white" value={q.marks} onChange={(e) => updateQuestion(q.id, "marks", Math.abs(parseInt(e.target.value) || 0))} />
@@ -402,11 +419,11 @@ export default function CreateTestPage() {
                             </div>
 
                             {(q.type === "SINGLE_CORRECT" || q.type === "MULTI_CORRECT") && (
-                                <div className="space-y-3 mt-4 bg-gray-50 p-4 rounded-lg border">
-                                    <Label className="text-sm font-medium text-gray-700">Options (Tick correct ones)</Label>
+                                <div className="space-y-3 mt-4 bg-gray-50 dark:bg-white/5/50 p-4 rounded-lg border dark:border-slate-700">
+                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Options (Tick correct ones)</Label>
                                     <div className="space-y-2">
                                         {q.options.map((opt, optIdx) => (
-                                            <div key={optIdx} className="flex items-center gap-3 bg-white p-2 rounded-md border focus-within:border-blue-400 transition-all group">
+                                            <div key={optIdx} className="flex items-center gap-3 bg-white dark:bg-white/5 dark:backdrop-blur-md p-2 rounded-md border dark:border-slate-700 focus-within:border-blue-400 transition-all group">
                                                 <input
                                                     type={q.type === "SINGLE_CORRECT" ? "radio" : "checkbox"}
                                                     name={`correct-${q.id}`}
@@ -446,21 +463,21 @@ export default function CreateTestPage() {
                             )}
 
                             {(q.type === "FILL_IN_BLANK" || q.type === "INTEGER_TYPE") && (
-                                <div className="mt-4 p-4 bg-green-50 border border-green-100 rounded-lg space-y-2">
-                                    <Label className="text-sm font-semibold text-green-800">Correct Answer (For Auto-Evaluation)</Label>
+                                <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30 rounded-lg space-y-2">
+                                    <Label className="text-sm font-semibold text-green-800 dark:text-green-400">Correct Answer (For Auto-Evaluation)</Label>
                                     <Input
                                         type={q.type === "INTEGER_TYPE" ? "number" : "text"}
                                         placeholder={q.type === "INTEGER_TYPE" ? "e.g. 42" : "e.g. O(n log n)"}
                                         value={q.correctAnswer || ""}
                                         onChange={(e) => updateQuestion(q.id, "correctAnswer", e.target.value)}
-                                        className="bg-white border-green-200 focus-visible:ring-green-400"
+                                        className="bg-white dark:bg-white/5 dark:backdrop-blur-md border-green-200 dark:border-green-900/50 focus-visible:ring-green-400"
                                     />
                                 </div>
                             )}
                         </div>
                     ))}
 
-                    <Button onClick={addQuestion} variant="outline" className="w-full py-6 md:py-8 border-dashed border-2 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 gap-2 transition-all text-gray-500">
+                    <Button onClick={addQuestion} variant="outline" className="w-full py-6 md:py-8 border-dashed border-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-800 gap-2 transition-all text-gray-500 dark:text-gray-400 dark:border-slate-700">
                         <PlusCircle className="h-5 w-5" /> Add New Question
                     </Button>
                 </div>

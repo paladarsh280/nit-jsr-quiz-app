@@ -88,7 +88,7 @@ export async function getQuizForStudent(quizId: string) {
 }
 
 
-export async function submitExam(quizId: string, answersJson: string) {
+export async function submitExam(quizId: string, answersJson: string, timeTakenMs: number = 0) {
     try {
         console.log("Backend Received QuizId:", quizId);
 
@@ -179,6 +179,7 @@ export async function submitExam(quizId: string, answersJson: string) {
                     score: totalScore,
                     isFinished: true,
                     endedAt: new Date(),
+                    timeTakenMs: timeTakenMs,
                     answers: { create: answerRecords }
                 }
             });
@@ -190,6 +191,7 @@ export async function submitExam(quizId: string, answersJson: string) {
                     score: totalScore,
                     isFinished: true,
                     endedAt: new Date(),
+                    timeTakenMs: timeTakenMs,
                     answers: { create: answerRecords }
                 }
             });
@@ -424,6 +426,39 @@ export async function getLiveLeaderboardForStudent(quizId: string) {
         const myStats = leaderboard.find(l => l.studentId === studentId);
 
         return { success: true, top3, fullList: leaderboard, myStats };
+    } catch {
+        return { success: false, error: "Failed to fetch leaderboard" };
+    }
+}
+
+export async function getNormalQuizLeaderboard(quizId: string) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session || session.user.role !== "STUDENT") return { success: false, error: "Unauthorized" };
+        const studentId = session.user.id;
+
+        const attempts = await prisma.studentAttempt.findMany({
+            where: { quizId, isFinished: true },
+            include: {
+                student: { select: { name: true, id: true } }
+            },
+            orderBy: [
+                { score: 'desc' },
+                { timeTakenMs: 'asc' }
+            ]
+        });
+
+        const leaderboard = attempts.map((a, idx) => ({
+            rank: idx + 1,
+            name: a.student.name || "Student",
+            studentId: a.student.id,
+            score: a.score,
+            timeTakenMs: a.timeTakenMs
+        }));
+
+        const myStats = leaderboard.find(l => l.studentId === studentId);
+
+        return { success: true, fullList: leaderboard, myStats };
     } catch {
         return { success: false, error: "Failed to fetch leaderboard" };
     }

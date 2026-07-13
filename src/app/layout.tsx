@@ -4,6 +4,10 @@ import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Toaster } from "@/components/ui/sonner";
 
+import { StarryBackground } from "@/components/ui/StarryBackground";
+
+import NextTopLoader from 'nextjs-toploader';
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -11,11 +15,17 @@ export const metadata: Metadata = {
   description: "Official Quiz Portal for NIT Jamshedpur",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
+        <NextTopLoader color="#3b82f6" showSpinner={false} />
         <Providers>
+          <StarryBackground />
           {children}
           <Toaster position="top-center" richColors />
         </Providers>

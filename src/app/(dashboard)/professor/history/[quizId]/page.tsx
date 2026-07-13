@@ -89,6 +89,7 @@ export default function QuizDetailsPage() {
             "Email (Roll No)": attempt.student.email,
             "Status": attempt.isFinished ? "Submitted" : "In Progress",
             "Total Score": attempt.score,
+            "Time Taken": attempt.timeTakenMs ? `${Math.floor(attempt.timeTakenMs / 60000)}m ${Math.floor((attempt.timeTakenMs % 60000) / 1000)}s` : "0m 0s",
         }));
 
         // 2. SheetJS (xlsx) use karke file banao
@@ -109,29 +110,29 @@ export default function QuizDetailsPage() {
         <div className="max-w-6xl mx-auto space-y-6 pb-20">
 
             {/* Top Navigation */}
-            <Button variant="ghost" onClick={() => router.push("/professor")} className="gap-2 -ml-4 text-gray-500 hover:text-gray-900">
+            <Button variant="ghost" onClick={() => router.push("/professor")} className="gap-2 -ml-4 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
                 <ArrowLeft className="h-4 w-4" /> Back to Dashboard
             </Button>
 
             {/* Header Card */}
-            <div className="bg-white p-6 md:p-8 rounded-xl border shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="bg-white dark:bg-white/5 dark:backdrop-blur-md p-6 md:p-8 rounded-xl border dark:border-slate-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div>
                     <div className="flex items-center gap-3 mb-2">
-                        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{quiz.title}</h1>
+                        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">{quiz.title}</h1>
                         <Badge variant={quiz.status === 'LIVE' ? 'default' : quiz.status === 'COMPLETED' ? 'secondary' : 'outline'}
-                            className={quiz.status === 'LIVE' ? 'bg-green-100 text-green-800' : ''}>
+                            className={quiz.status === 'LIVE' ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-400' : ''}>
                             {quiz.status}
                         </Badge>
                     </div>
-                    <p className="text-gray-500 text-sm max-w-2xl">{quiz.description || "No description provided."}</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm max-w-2xl">{quiz.description || "No description provided."}</p>
                     <div className="mt-4 flex flex-wrap gap-4 text-sm font-medium">
-                        <span className="bg-gray-100 px-3 py-1.5 rounded-md border text-gray-700 font-mono">
-                            Code: <strong className="text-lg tracking-wider text-blue-700">{quiz.code}</strong>
+                        <span className="bg-gray-100 dark:bg-white/5 px-3 py-1.5 rounded-md border dark:border-slate-700 text-gray-700 dark:text-gray-300 font-mono">
+                            Code: <strong className="text-lg tracking-wider text-blue-700 dark:text-blue-400">{quiz.code}</strong>
                         </span>
-                        <span className="flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 rounded-md text-blue-700">
+                        <span className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-md text-blue-700 dark:text-blue-400">
                             <BookOpen className="h-4 w-4" /> {quiz.questions.length} Questions
                         </span>
-                        <span className="flex items-center gap-1.5 bg-purple-50 px-3 py-1.5 rounded-md text-purple-700">
+                        <span className="flex items-center gap-1.5 bg-purple-50 dark:bg-purple-900/30 px-3 py-1.5 rounded-md text-purple-700 dark:text-purple-400">
                             <Users className="h-4 w-4" /> {quiz.attempts.length} Attempts
                         </span>
                     </div>
@@ -140,7 +141,7 @@ export default function QuizDetailsPage() {
                 {/* Right Side: QR Code & Actions */}
                 <div className="flex flex-col md:flex-row items-center gap-6 w-full md:w-auto">
                     {/* QR Code */}
-                    <div className="flex flex-col items-center justify-center bg-gray-50 p-3 rounded-lg border hover:shadow-md transition-shadow">
+                    <div className="flex flex-col items-center justify-center bg-gray-50 dark:bg-white p-3 rounded-lg border dark:border-transparent hover:shadow-md transition-shadow">
                         <QRCodeSVG
                             value={typeof window !== 'undefined' ? `${window.location.origin}/test/${quiz.id}` : ''}
                             size={120}
@@ -154,15 +155,15 @@ export default function QuizDetailsPage() {
                     <div className="flex flex-col gap-3 w-full md:w-auto min-w-[200px]">
                         {quiz.status === "DRAFT" && (
                             <div className="flex flex-col gap-2 w-full">
-                                <div className="bg-blue-50/80 border border-blue-100 rounded-lg p-3 flex items-center justify-between shadow-sm animate-in fade-in zoom-in duration-300">
+                                <div className="bg-blue-50/80 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/50 rounded-lg p-3 flex items-center justify-between shadow-sm animate-in fade-in zoom-in duration-300">
                                     <div className="flex items-center gap-2">
                                         <div className="relative flex h-3 w-3">
                                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                                             <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
                                         </div>
-                                        <span className="text-sm font-semibold text-blue-800">Students Waiting</span>
+                                        <span className="text-sm font-semibold text-blue-800 dark:text-blue-300">Students Waiting</span>
                                     </div>
-                                    <span className="text-2xl font-black text-blue-700">{waitingUsers}</span>
+                                    <span className="text-2xl font-black text-blue-700 dark:text-blue-400">{waitingUsers}</span>
                                 </div>
                                 <Button onClick={() => handleStatusChange("LIVE")} disabled={statusLoading} className="bg-green-600 hover:bg-green-700 w-full gap-2 h-11">
                                     {statusLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />} Start Test (Make Live)
@@ -197,47 +198,51 @@ export default function QuizDetailsPage() {
 
                 {/* RESULTS TAB */}
                 <TabsContent value="results" className="mt-6 space-y-4">
-                    <div className="flex justify-between items-center bg-white p-4 rounded-t-xl border-b">
-                        <h2 className="text-lg font-semibold text-gray-800">Leaderboard & Marks</h2>
+                    <div className="flex justify-between items-center bg-white dark:bg-white/5 dark:backdrop-blur-md p-4 rounded-t-xl border-b dark:border-slate-800 border dark:border-b-0">
+                        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Leaderboard & Marks</h2>
                         <Button
-                            onClick={handleDownloadExcel} // 🔥 YE ADD KIYA
+                            onClick={handleDownloadExcel}
                             variant="outline"
-                            className="gap-2 text-blue-600 border-blue-200 hover:bg-blue-50"
+                            className="gap-2 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900 hover:bg-blue-50 dark:hover:bg-blue-900/30"
                         >
                             <Download className="h-4 w-4" /> Download Excel
                         </Button>
                     </div>
 
-                    <div className="bg-white border rounded-b-xl overflow-x-auto">
+                    <div className="bg-white dark:bg-white/5 dark:backdrop-blur-md border dark:border-slate-800 dark:border-t-0 rounded-b-xl overflow-x-auto">
                         <Table className="min-w-[600px]">
-                            <TableHeader className="bg-gray-50">
+                            <TableHeader className="bg-gray-50 dark:bg-white/5/50">
                                 <TableRow>
                                     <TableHead className="w-16 text-center">Rank</TableHead>
                                     <TableHead>Student Name</TableHead>
                                     <TableHead>Email (Roll No)</TableHead>
                                     <TableHead>Status</TableHead>
+                                    <TableHead>Time Taken</TableHead>
                                     <TableHead className="text-right">Score</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {quiz.attempts.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                                        <TableCell colSpan={6} className="text-center py-8 text-gray-500 dark:text-gray-400">
                                             No students have attempted this quiz yet.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     quiz.attempts.map((attempt: any, idx: number) => (
-                                        <TableRow key={attempt.id}>
-                                            <TableCell className="text-center font-semibold text-gray-500">{idx + 1}</TableCell>
-                                            <TableCell className="font-medium text-gray-900">{attempt.student.name || 'Unknown'}</TableCell>
-                                            <TableCell className="text-gray-600">{attempt.student.email}</TableCell>
+                                        <TableRow key={attempt.id} className="dark:hover:bg-slate-800/50">
+                                            <TableCell className="text-center font-semibold text-gray-500 dark:text-gray-400">{idx + 1}</TableCell>
+                                            <TableCell className="font-medium text-gray-900 dark:text-gray-200">{attempt.student.name || 'Unknown'}</TableCell>
+                                            <TableCell className="text-gray-600 dark:text-gray-400">{attempt.student.email}</TableCell>
                                             <TableCell>
-                                                <Badge variant={attempt.isFinished ? "default" : "outline"} className={attempt.isFinished ? "bg-green-100 text-green-800" : "text-yellow-600"}>
+                                                <Badge variant={attempt.isFinished ? "default" : "outline"} className={attempt.isFinished ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400" : "text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-900"}>
                                                     {attempt.isFinished ? "Submitted" : "In Progress"}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-right font-bold text-blue-600">{attempt.score} Marks</TableCell>
+                                            <TableCell className="text-gray-600 dark:text-gray-400 font-mono">
+                                                {attempt.timeTakenMs ? `${Math.floor(attempt.timeTakenMs / 60000)}m ${Math.floor((attempt.timeTakenMs % 60000) / 1000)}s` : "0m 0s"}
+                                            </TableCell>
+                                            <TableCell className="text-right font-bold text-blue-600 dark:text-blue-400">{attempt.score} Marks</TableCell>
                                         </TableRow>
                                     ))
                                 )}
@@ -250,14 +255,14 @@ export default function QuizDetailsPage() {
                 <TabsContent value="questions" className="mt-6">
                     <div className="space-y-4">
                         {quiz.questions.map((q: any, i: number) => (
-                            <div key={q.id} className="bg-white p-5 rounded-xl border shadow-sm">
+                            <div key={q.id} className="bg-white dark:bg-white/5 dark:backdrop-blur-md p-5 rounded-xl border dark:border-slate-800 shadow-sm">
                                 <div className="flex gap-2 mb-2">
                                     <Badge variant="secondary">Q{i + 1}</Badge>
-                                    <Badge variant="outline" className="text-xs">{q.type.replace(/_/g, ' ')}</Badge>
-                                    <Badge variant="outline" className="text-green-600 border-green-200">+{q.marks} / -{q.negative}</Badge>
+                                    <Badge variant="outline" className="text-xs dark:border-slate-700">{q.type.replace(/_/g, ' ')}</Badge>
+                                    <Badge variant="outline" className="text-green-600 dark:text-green-400 border-green-200 dark:border-green-900/50">+{q.marks} / -{q.negative}</Badge>
                                 </div>
-                                <p className="text-gray-800 font-medium whitespace-pre-wrap">{q.text}</p>
-                                {q.imageUrl && <img src={q.imageUrl} alt="Q Diagram" className="mt-3 h-32 object-contain rounded border p-1" />}
+                                <p className="text-gray-800 dark:text-gray-200 font-medium whitespace-pre-wrap">{q.text}</p>
+                                {q.imageUrl && <img src={q.imageUrl} alt="Q Diagram" className="mt-3 h-32 object-contain rounded border dark:border-slate-700 p-1 bg-white dark:bg-white/5" />}
                             </div>
                         ))}
                     </div>
