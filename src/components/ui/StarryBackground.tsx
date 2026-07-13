@@ -54,8 +54,8 @@ export function StarryBackground() {
             radius: number;
 
             constructor() {
-                this.x = Math.random() * canvas.width;
-                this.y = Math.random() * canvas.height;
+                this.x = Math.random() * canvas!.width;
+                this.y = Math.random() * canvas!.height;
                 this.vx = (Math.random() - 0.5) * 0.7; // Gentle speed
                 this.vy = (Math.random() - 0.5) * 0.7;
                 this.radius = Math.random() * 2 + 1.5; // Slightly larger atoms
@@ -74,8 +74,8 @@ export function StarryBackground() {
             }
 
             update() {
-                if (this.x < 0 || this.x > canvas.width) this.vx = -this.vx;
-                if (this.y < 0 || this.y > canvas.height) this.vy = -this.vy;
+                if (this.x < 0 || this.x > canvas!.width) this.vx = -this.vx;
+                if (this.y < 0 || this.y > canvas!.height) this.vy = -this.vy;
                 this.x += this.vx;
                 this.y += this.vy;
 
@@ -93,7 +93,7 @@ export function StarryBackground() {
         const initParticles = () => {
             particles = [];
             // Calculate optimal number of particles based on screen size
-            const numParticles = Math.floor((canvas.width * canvas.height) / 12000); 
+            const numParticles = Math.floor((canvas!.width * canvas!.height) / 12000); 
             for (let i = 0; i < Math.min(numParticles, 150); i++) { // cap at 150 for performance
                 particles.push(new Particle());
             }
@@ -136,7 +136,7 @@ export function StarryBackground() {
 
         const animate = () => {
             if (!ctx) return;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas!.width, canvas!.height);
             
             ctx.shadowBlur = 0; // Reset shadow for lines
             drawLines();

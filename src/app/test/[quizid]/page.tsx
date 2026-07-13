@@ -482,9 +482,9 @@ export default function ExamRoom() {
         const res = await submitExam(quizId, answersString, timeTakenMs);
         if (res.success) {
             localStorage.removeItem(`exam_state_${quizId}`);
-            setFinalScore(res.score);
+            setFinalScore(res.score ?? null);
             setShowResultModal(true);
-            toast.success(isAutoSubmit ? `Auto-Submitted! Score: ${res.score}` : `Exam Submitted Successfully! Score: ${res.score}`, { id: "exam-submitted" });
+            toast.success(isAutoSubmit ? `Auto-Submitted! Score: ${res.score ?? 0}` : `Exam Submitted Successfully! Score: ${res.score ?? 0}`, { id: "exam-submitted" });
         } else {
             toast.error(res.error, { id: "exam-submit-err" });
             setIsSubmitting(false);
