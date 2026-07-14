@@ -4,6 +4,7 @@
 import prisma from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { redis } from "@/lib/redis";
 
 export async function verifyAndJoinQuiz(code: string) {
     try {
@@ -195,6 +196,16 @@ export async function submitExam(quizId: string, answersJson: string, timeTakenM
                     answers: { create: answerRecords }
                 }
             });
+        }
+
+        // Update Redis Leaderboard for Normal Exam
+        try {
+            const timeMetric = (99999999 - Math.min(timeTakenMs, 99999999)) / 100000000;
+            const redisScore = totalScore + timeMetric;
+            await redis.zadd(`quiz_leaderboard:normal:${quizId}`, { score: redisScore, member: studentId });
+            await redis.hset(`quiz_students:${quizId}`, { [studentId]: session.user.name || "Student" });
+        } catch (e) {
+            console.error("Redis Normal Leaderboard Error:", e);
         }
 
         return { success: true, score: totalScore };
@@ -390,6 +401,14 @@ export async function submitLiveAnswer(
             });
         }
 
+        // Update Redis Leaderboard for Live Guided
+        try {
+            await redis.zincrby(`quiz_leaderboard:live:${quizId}`, marksAwarded, studentId);
+            await redis.hset(`quiz_students:${quizId}`, { [studentId]: session.user.name || "Student" });
+        } catch (e) {
+            console.error("Redis Live Leaderboard Error:", e);
+        }
+
         return { success: true, isCorrect, marksAwarded };
     } catch (error) {
         console.error("Live Answer Error:", error);
@@ -397,13 +416,41 @@ export async function submitLiveAnswer(
     }
 }
 
-// 4. LIVE GUIDED MODE: Get Top 5 Leaderboard + Current Student Rank
 export async function getLiveLeaderboardForStudent(quizId: string) {
     try {
         const session = await getServerSession(authOptions);
         if (!session || session.user.role !== "STUDENT") return { success: false, error: "Unauthorized" };
         const studentId = session.user.id;
 
+        try {
+            // Fetch blazing fast from Redis
+            const topIds = await redis.zrevrange(`quiz_leaderboard:live:${quizId}`, 0, -1, { withScores: true });
+            
+            if (topIds.length > 0) {
+                const studentNames: any = await redis.hgetall(`quiz_students:${quizId}`);
+                const leaderboard = [];
+
+                for (let i = 0; i < topIds.length; i += 2) {
+                    const sid = topIds[i] as string;
+                    const score = Number(topIds[i + 1]);
+                    leaderboard.push({
+                        rank: (i / 2) + 1,
+                        name: (studentNames && studentNames[sid]) || "Student",
+                        studentId: sid,
+                        score: score
+                    });
+                }
+
+                const top3 = leaderboard.slice(0, 3);
+                const myStats = leaderboard.find(l => l.studentId === studentId);
+
+                return { success: true, top3, fullList: leaderboard, myStats };
+            }
+        } catch (redisError) {
+            console.error("Redis Live Leaderboard fetch failed, falling back to DB:", redisError);
+        }
+
+        // Fallback to Prisma if Redis fails or is empty
         const attempts = await prisma.studentAttempt.findMany({
             where: { quizId },
             include: {
@@ -419,14 +466,12 @@ export async function getLiveLeaderboardForStudent(quizId: string) {
             score: a.score
         }));
 
-        // Top 3 for podium display
         const top3 = leaderboard.slice(0, 3);
-
-        // Find current student's stats
         const myStats = leaderboard.find(l => l.studentId === studentId);
 
         return { success: true, top3, fullList: leaderboard, myStats };
-    } catch {
+    } catch (error) {
+        console.error("Leaderboard Error:", error);
         return { success: false, error: "Failed to fetch leaderboard" };
     }
 }
@@ -437,6 +482,42 @@ export async function getNormalQuizLeaderboard(quizId: string) {
         if (!session || session.user.role !== "STUDENT") return { success: false, error: "Unauthorized" };
         const studentId = session.user.id;
 
+        try {
+            // Try Redis first for zero latency
+            const topIds = await redis.zrevrange(`quiz_leaderboard:normal:${quizId}`, 0, -1, { withScores: true });
+            
+            if (topIds.length > 0) {
+                const studentNames: any = await redis.hgetall(`quiz_students:${quizId}`);
+                const leaderboard = [];
+                for (let i = 0; i < topIds.length; i += 2) {
+                    const sid = topIds[i] as string;
+                    const rawScore = Number(topIds[i + 1]);
+                    
+                    let score = Math.floor(rawScore);
+                    let timeTakenMs = 99999999 - Math.round((rawScore - score) * 100000000);
+                    
+                    if (rawScore < 0) {
+                        score = Math.ceil(rawScore);
+                        timeTakenMs = 99999999 - Math.round(Math.abs(rawScore - score) * 100000000);
+                    }
+
+                    leaderboard.push({
+                        rank: (i / 2) + 1,
+                        name: (studentNames && studentNames[sid]) || "Student",
+                        studentId: sid,
+                        score: score,
+                        timeTakenMs: Math.abs(timeTakenMs)
+                    });
+                }
+
+                const myStats = leaderboard.find(l => l.studentId === studentId);
+                return { success: true, fullList: leaderboard, myStats };
+            }
+        } catch (redisError) {
+            console.error("Redis Normal Leaderboard fetch failed, falling back to DB:", redisError);
+        }
+
+        // Fallback to PostgreSQL if Redis is empty or expired
         const attempts = await prisma.studentAttempt.findMany({
             where: { quizId, isFinished: true },
             include: {
