@@ -424,7 +424,7 @@ export async function getLiveLeaderboardForStudent(quizId: string) {
 
         try {
             // Fetch blazing fast from Redis
-            const topIds = await redis.zrevrange(`quiz_leaderboard:live:${quizId}`, 0, -1, { withScores: true });
+            const topIds = await redis.zrange(`quiz_leaderboard:live:${quizId}`, 0, -1, { rev: true, withScores: true });
             
             if (topIds.length > 0) {
                 const studentNames: any = await redis.hgetall(`quiz_students:${quizId}`);
@@ -484,7 +484,7 @@ export async function getNormalQuizLeaderboard(quizId: string) {
 
         try {
             // Try Redis first for zero latency
-            const topIds = await redis.zrevrange(`quiz_leaderboard:normal:${quizId}`, 0, -1, { withScores: true });
+            const topIds = await redis.zrange(`quiz_leaderboard:normal:${quizId}`, 0, -1, { rev: true, withScores: true });
             
             if (topIds.length > 0) {
                 const studentNames: any = await redis.hgetall(`quiz_students:${quizId}`);
