@@ -10,18 +10,20 @@ const prisma = new PrismaClient({ adapter });
 
 async function seed() {
   try {
-    await prisma.user.upsert({
-      where: { email: 'paladarsh593@gmail.com' },
-      update: { role: 'PROFESSOR' },
-      create: { 
-        email: 'paladarsh593@gmail.com', 
-        name: 'Adarsh (Testing Professor)', 
-        role: 'PROFESSOR',
-        image: 'https://lh3.googleusercontent.com/a/ACg8ocILMWn62nUeY5GRwNVDTGOndxlBy9lvOOB8XMm-PXts8F35oA=s96-c'
-      }
-    });
-    console.log('Successfully seeded paladarsh593@gmail.com as PROFESSOR');
-  } catch(e) {
+    const emailsToSeed = ['paladarsh593@gmail.com', 'mvi@nitjsr.ac.in', 'unnamedutopia@gmail.com'];
+    for (const email of emailsToSeed) {
+      await prisma.user.upsert({
+        where: { email },
+        update: { role: 'PROFESSOR' },
+        create: {
+          email,
+          name: email.split('@')[0],
+          role: 'PROFESSOR',
+        }
+      });
+      console.log(`Successfully seeded ${email} as PROFESSOR`);
+    }
+  } catch (e) {
     console.error('Seeding failed:', e);
   } finally {
     await prisma.$disconnect();

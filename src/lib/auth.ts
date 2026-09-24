@@ -21,7 +21,7 @@ export const authOptions: NextAuthOptions = {
             },
             profile(profile) {
 
-                if (profile.email === "paladarsh593@gmail.com" || profile.email === "unnamedutopia@gmail.com") {
+                if (profile.email === "paladarsh593@gmail.com" || profile.email === "unnamedutopia@gmail.com" || profile.email === "mvi@nitjsr.ac.in") {
                     return {
                         id: profile.sub,
                         name: profile.name,
@@ -65,7 +65,11 @@ export const authOptions: NextAuthOptions = {
                 token.role = (user as any).role || "STUDENT";
             }
 
-            if (token.email === "paladarsh593@gmail.com" || token.email === "unnamedutopia@gmail.com") {
+            if (
+                token.email === "paladarsh593@gmail.com" ||
+                token.email === "unnamedutopia@gmail.com" ||
+                token.email === "mvi@nitjsr.ac.in"
+            ) {
                 token.role = "PROFESSOR";
             } else if (!token.role && token.email) {
 
