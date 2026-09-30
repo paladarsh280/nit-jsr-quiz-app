@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 const { Pool } = require('pg');
 const { PrismaPg } = require('@prisma/adapter-pg');
@@ -10,7 +11,7 @@ const prisma = new PrismaClient({ adapter });
 
 async function seed() {
   try {
-    const emailsToSeed = ['paladarsh593@gmail.com', 'mvi@nitjsr.ac.in', 'unnamedutopia@gmail.com'];
+    const emailsToSeed = ['paladarsh593@gmail.com', 'mvi@nitjsr.ac.in', 'unnamedutopia@gmail.com', 'anandohm55@gmail.com'];
     for (const email of emailsToSeed) {
       await prisma.user.upsert({
         where: { email },
