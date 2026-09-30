@@ -85,7 +85,8 @@
 .dark {
   --background: transparent;
   --foreground: oklch(0.98 0 0);
-  --card: oklch(0.05 0 0 / 0.5); /* 0.05 lightness, 50% opacity */
+  --card: oklch(0.05 0 0 / 0.5);
+  /* 0.05 lightness, 50% opacity */
   --card-foreground: oklch(0.98 0 0);
   --popover: transparent;
   --popover-foreground: oklch(0.98 0 0);
@@ -119,14 +120,47 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    -webkit-touch-callout: none !important;
   }
+
   body {
     @apply bg-background text-foreground;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none !important;
   }
+
+  input,
+  textarea {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+  }
+
+  img {
+    -webkit-user-drag: none;
+    user-drag: none;
+    pointer-events: none;
+    -webkit-touch-callout: none !important;
+  }
+
   .dark body {
     background-color: transparent;
   }
+
   html {
     @apply font-sans;
+  }
+}
+
+@media print {
+
+  html,
+  body {
+    display: none !important;
+    visibility: hidden !important;
   }
 }
