@@ -170,15 +170,6 @@ export function ScreenshotProtection() {
 
     return (
         <>
-            {/* Dynamic Security Watermark across screen */}
-            <div className="fixed inset-0 z-[88888] pointer-events-none overflow-hidden select-none opacity-[0.035] dark:opacity-[0.05] flex flex-wrap content-between justify-between p-4 rotate-[-15deg] scale-125">
-                {Array.from({ length: 24 }).map((_, idx) => (
-                    <div key={idx} className="p-6 text-xs md:text-sm font-mono font-bold tracking-widest text-foreground uppercase whitespace-nowrap">
-                        {userEmail} • NIT JSR • SECURITY PROTECTED
-                    </div>
-                ))}
-            </div>
-
             {/* Security Overlay when blurred */}
             {isBlurred && (
                 <div className="fixed inset-0 z-[99999] bg-slate-950/95 backdrop-blur-xl flex flex-col items-center justify-center text-center p-6 select-none pointer-events-auto">
