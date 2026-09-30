@@ -92,16 +92,36 @@ export function ScreenshotProtection() {
             }
         };
 
-        // 4. Mobile Multi-Finger Gesture Protection (e.g. 3-finger swipe screenshot on Android)
+        // 4. Mobile Multi-Finger & Gesture Protection (e.g. 3-finger swipe or Circle to Search bottom hold)
         const handleTouchStart = (e: TouchEvent) => {
             if (e.touches && e.touches.length >= 3) {
                 setIsBlurred(true);
                 setTimeout(() => setIsBlurred(false), 2000);
                 toast.error("Multi-finger gesture detected! Content protected.", { id: "sec-touch" });
+                return;
+            }
+
+            // Detect long touch / holding near bottom navigation handle (Circle to Search / Gemini Overlay trigger)
+            const touch = e.touches[0];
+            if (touch && touch.clientY > window.innerHeight - 70) {
+                // Holding near bottom nav bar
+                const timer = setTimeout(() => {
+                    setIsBlurred(true);
+                    setTimeout(() => setIsBlurred(false), 2000);
+                    toast.error("Assistant / Circle Search gesture detected!", { id: "sec-circle-search" });
+                }, 300);
+
+                const cancelHold = () => {
+                    clearTimeout(timer);
+                    window.removeEventListener("touchend", cancelHold);
+                    window.removeEventListener("touchmove", cancelHold);
+                };
+                window.addEventListener("touchend", cancelHold);
+                window.addEventListener("touchmove", cancelHold);
             }
         };
 
-        // 5. Blur on window blur / tab switch / pagehide (App Switcher on Mobile)
+        // 5. Blur INSTANTLY on window blur / tab switch / pagehide / Gemini overlay launch
         const handleWindowBlur = () => {
             setIsBlurred(true);
         };
@@ -166,7 +186,7 @@ export function ScreenshotProtection() {
                         <div className="text-5xl mb-4">🛡️</div>
                         <h2 className="text-2xl font-bold text-red-400 mb-2">Content Protected</h2>
                         <p className="text-gray-300 text-sm">
-                            Screen capturing or switching away is restricted to maintain portal security. Return focus to resume.
+                            Screen capturing, Gemini Search, or switching away is restricted to maintain portal security. Return focus to resume.
                         </p>
                     </div>
                 </div>
